@@ -36,7 +36,6 @@ func main() {
 	logging.LogEvent("Инициализация бота")
 	habrBot := bot.NewBot(config)
 	
-
 	args := os.Args[1:]
 	if len(args) == 0 {
 

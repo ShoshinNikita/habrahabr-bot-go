@@ -46,11 +46,8 @@
 
 ```json
 {
-	"all": "https://habrahabr.ru/rss/all/?with_hubs=true:?with_tags=true:",
-	"best": "https://habrahabr.ru/rss/best/?with_hubs=true:?with_tags=true:",
 	"token": "***BOT TOKEN***",
 	"delay": "***TIME IN NANOSECONDS***",
-	"instantView": "https://t.me/iv?url={url}&rhash=***IV HASH***",
 	"password": "***PASSWORD FOR WEBSITE***"
 }
 ```

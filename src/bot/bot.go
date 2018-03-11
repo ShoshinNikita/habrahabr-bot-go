@@ -34,7 +34,7 @@ func NewBot(config ConfigData) (*HabrahabrBot) {
 	// Инициализация бота
 	var bot HabrahabrBot
 	bot.config = config
-	bot.botAPI, err = tgbotapi.NewBotAPI("")
+	bot.botAPI, err = tgbotapi.NewBotAPI(bot.config.Token)
 	if err != nil {
 		logging.LogFatalError("main", err)
 	}
@@ -462,7 +462,7 @@ func (bot *HabrahabrBot) sendIV(data chan *tgbotapi.Message, config ConfigData) 
 		// Если сообщение попало сюда, значит, ссылка точно есть
 		link := regexpPattern.FindString(msg.Text)
 
-		instantViewURL, _ := formatString(config.InstantViewURL, map[string]string{"url": link})
+		instantViewURL := formatString(instantViewURL, map[string]string{"url": link})
 		text := "<a href=\"" + instantViewURL + "\">InstantView</a>\n\n" +
 				"<a href=\"" + link + "\">Перейти к статье</a>\n\n" + 
 				"<a href=\"" + link + "#comments\">Перейти к комментариям</a>"
@@ -484,7 +484,7 @@ func (bot * HabrahabrBot) getBest(data chan *tgbotapi.Message, config ConfigData
 	const link string = "<a href='{link}'>{title}</a>"
 
 	for msg := range data {
-		feed, err := parser.ParseURL(config.RssBestURL)
+		feed, err := parser.ParseURL(bestArticlesURL)
 		if err != nil {
 			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
 			continue
@@ -504,8 +504,7 @@ func (bot * HabrahabrBot) getBest(data chan *tgbotapi.Message, config ConfigData
 				break
 			}
 			number := strconv.Itoa(i + 1)
-			articleLink, _ := formatString(link, map[string]string{"link": item.Link, "title": item.Title})
-			bestArticles += number + ") " + articleLink + "\n"
+			bestArticles += number + ") " + formatString(link, map[string]string{"link": item.Link, "title": item.Title}) + "\n"
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, bestArticles)
@@ -518,13 +517,13 @@ func (bot * HabrahabrBot) getBest(data chan *tgbotapi.Message, config ConfigData
 }
 
 
-// mailout рассылает статьи с периодичностью delay наносекунд
+// mailout рассылает статьи с периодичностью config.Delay наносекунд
 func (bot *HabrahabrBot) mailout(config ConfigData) {
 	// Parser
 	parser := gofeed.NewParser()
 	var lastTime time.Time
 	
-	// read LastTime
+	// Чтение LastTime
 	raw, err := ioutil.ReadFile("./data/lastArticleTime.txt")
 	if err != nil {
 		logging.LogFatalError("Mailout", err)
@@ -535,16 +534,20 @@ func (bot *HabrahabrBot) mailout(config ConfigData) {
 	
 	// Таймер
 	ticker := time.NewTicker(time.Duration(config.Delay))
+	var counterSendedArticles int // Подсчитывает количество отправленных статей за 1 цикл рассылки. Если превышает 25, то бот засыпает на 1 с
+	
 	// Первый раз статьи отправляются сразу
 	for ; true; <- ticker.C {
 		logging.LogEvent("Рассылка")
+		counterSendedArticles = 0
 
-		// Создание списка новых статей
-		feed, err := parser.ParseURL(config.RssAllURL)
+		// Получение RSS-ленты
+		feed, err := parser.ParseURL(allArticlesURL)
 		if err != nil {
 			logging.LogMinorError("Mailout", err)
 			continue
 		}
+		// Создание списка новых статей
 		var newArticles []article
 		for _, item := range feed.Items {
 			articleTime, err := time.Parse(time.RFC1123, item.Published)
@@ -562,7 +565,11 @@ func (bot *HabrahabrBot) mailout(config ConfigData) {
 					tag = strings.ToLower(tag)
 					tags = append(tags, tag)
 				}
-				temp := article{title: item.Title, tags: tags, link: item.Link}
+				instantView := formatString(instantViewURL, map[string]string{"url": item.Link})
+				message := formatString(messageText, map[string]string{"title": item.Title, "IV": instantView, "link": item.Link})
+
+				temp := article{title: item.Title, tags: tags, link: item.Link, message: message}
+				
 				newArticles = append(newArticles, temp)
 			} else {
 				break
@@ -581,6 +588,7 @@ func (bot *HabrahabrBot) mailout(config ConfigData) {
 			logging.LogMinorError("Mailout", err)
 			continue
 		}
+		// Проход по всем пользователям
 		for users.Next() {
 			var id int64
 			var sTags string
@@ -590,31 +598,40 @@ func (bot *HabrahabrBot) mailout(config ConfigData) {
 				userTags = strings.Split(sTags, " ")
 			}
 
-			// Проверка, есть ли теги пользователя в статье
+			// Проход по всем статьям в обратном порядке
 			for i := len(newArticles) - 1; i >= 0; i-- {
-				shouldSent := false
-				for _, tag := range newArticles[i].tags {
-					for _, userTag := range userTags {
-						if tag == userTag {
-							shouldSent = true
-							goto loopEnd
+				shouldSend := false
+				if len(userTags) == 0 {
+					shouldSend = true
+				} else {
+					// Проверка, есть ли теги пользователя в статье
+					for _, tag := range newArticles[i].tags {
+						for _, userTag := range userTags {
+							if tag == userTag {
+								shouldSend = true
+								goto loopEnd
+							}
 						}
 					}
+					loopEnd:
 				}
-				loopEnd:
 				// Отправка пользователю
-				if shouldSent || len(userTags) == 0 {
-					instantViewURL, _ := formatString(config.InstantViewURL, map[string]string{"url": newArticles[i].link})
-					text := newArticles[i].title + " <a href=\"" + instantViewURL + "\">(IV)</a>\n\n" +
-							"<a href=\"" + newArticles[i].link + "\">Перейти к статье</a>\n\n" + 
-							"<a href=\"" + newArticles[i].link + "#comments\">Перейти к комментариям</a>"
+				if shouldSend {
+					counterSendedArticles++
 
-					message := tgbotapi.NewMessage(id, text)
+					message := tgbotapi.NewMessage(id, newArticles[i].message)
 					message.ParseMode = "HTML"
 					_, err = bot.send(message)
 					if err != nil {
 						logging.LogSendingError(logging.ErrorData{err, "Empty", id})
 					}
+				}
+
+				// Если превышено количество отправленных статей, то goroutine засыпает на 1 секунду
+				if counterSendedArticles > maxArticlesLimit {
+					counterSendedArticles = 0
+					logging.LogEvent("Sleep")
+					time.Sleep(time.Second)
 				}
 			}
 		}

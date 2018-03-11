@@ -2,7 +2,6 @@ package bot
 
 import (
 	"strings"
-	"errors"
 )
 
 
@@ -20,16 +19,11 @@ func getTagsFromString(sTags string) map[string]bool {
 
 
 // FormatString форматирует строку, подставляя вместо {name} value из args, где key == name.
-// Если какого либо арумента нет, возвращается ошибка.
-func formatString(s string, args map[string]string) (string, error) {
+func formatString(s string, args map[string]string) (string) {
 	for key, value := range args {
 		pattern := "{" + key + "}"
-		if strings.Index(s, pattern) == -1 {
-			err := errors.New("No such argument '" + key + "'")
-			return "", err
-		}
 		s = strings.Replace(s, pattern, value, -1)
 	}
-
-	return s, nil
+	
+	return s
 }

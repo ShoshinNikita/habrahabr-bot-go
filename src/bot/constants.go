@@ -4,6 +4,18 @@ package bot
 const articleRegexPattern = "(?:https://|)habrahabr.ru/(?:post|company/\\w+/blog)/\\d{1,6}(?:/|)"
 
 const userRegexPattern = "^https://habrahabr.ru/users/[\\w\\s_]+/$"
+ 
+const messageText = "{title} <a href='{IV}'>(IV)</a>\n\n<a href='{link}'>Перейти к статье</a>\n\n<a href='{link}#comments'>Перейти к комментариям</a>"
+
+const maxArticlesLimit = 25 // Служит для ограничения отправки статей, чтобы Telegram не заблокировал бота
+
+// ссылка на InstantView с {url} вместо ссылки на статью
+const instantViewURL = "https://t.me/iv?url={url}&rhash=2cb77307aed3b2"
+
+const allArticlesURL = "https://habrahabr.ru/rss/all/?with_hubs=true:?with_tags=true:"
+
+const bestArticlesURL = "https://habrahabr.ru/rss/best/?with_hubs=true:?with_tags=true:"
+
 
 const helpText = `
 📝 <b>КОМАНДЫ</b>:
