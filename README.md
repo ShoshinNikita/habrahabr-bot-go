@@ -1,6 +1,6 @@
 # Habrahabr-бот на Go #
 
-Неофициальный бот для рассылки статей с сайта [habrahabr.ru](https://habrahabr.ru/top/) в Telegram
+Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram
 
 ## Требования ##
 
@@ -14,14 +14,14 @@
 
 ## Информация о работе ##
 
-Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/top/) для получения списка статей. Данные пользователей (id, теги) хранятся в SQLite базе данных.
+Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/) ([аналогично](https://geektimes.ru/rss/all/) для Geektimes) для получения списка статей. Данные пользователей (id, теги) хранятся в SQLite базе данных.
 
 ## Файлы и их описание ##
 
 ### Структура папок исходного кода ###
 
 * bot
-	* bot.go – основная часть, отвечающая за бота
+	* bot.go – модуль, отвечающий за бота
 	* functions.go – полезные функции
 	* structures.go – структуры, которые используются в боте
 	* constants.go - константы
@@ -31,14 +31,14 @@
 	* data
 		* config.json
 		* database.db
-		* lastArticleTime.txt
+		* lastArticleTime.json
 	* logs
 		* Log-файлы (создаются автоматически)
 	* templates
 		* index.html - страница отправки сообщений
 	* main.go – главный файл
 * website
-	* website.go – основная часть, отвечающая за сайт
+	* website.go – модуль, отвечающая за сайт
 
 ### Содержание файлов ###
 
@@ -55,15 +55,24 @@
 * Файл database.db – SQLite база данных.
 
 ```sql
-CREATE TABLE `users` (
-	`id`	INTEGER,
-	`tags`	TEXT DEFAULT "",
-	`is_stop`	INTEGER DEFAULT 0,
+CREATE TABLE "users" (
+	`id` INTEGER,
+	`habr_tags` TEXT DEFAULT "",
+	`habr_is_stop` INTEGER DEFAULT 0,
+	`geek_tags` INTEGER DEFAULT "",
+	`geek_is_stop` INTEGER DEFAULT 0,
 	PRIMARY KEY(`id`)
-);
+)
 ```
 
-* Файл lastArticleTime.txt содержит одну строку – время в UNIX формате (например, 1520337177)
+* Файл lastArticleTime.json хранит время последних отправленных статей в UNIX формате
+
+```json
+{
+	"habr": 0,
+	"geek": 0
+}
+```
 
 ## Лицензия ##
 

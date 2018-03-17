@@ -2,13 +2,13 @@ package website
 
 import (
 	"fmt"
-	"net/http"
 	"html/template"
+	"net/http"
 
 	botPackage "bot"
 )
 
-var bot *botPackage.HabrahabrBot
+var bot *botPackage.Bot
 var configPassword string
 
 // sendMessage отправляет сообщение через бота
@@ -35,7 +35,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 // RunSite запускает сайт
-func RunSite(mainBot *botPackage.HabrahabrBot, password string) {
+func RunSite(mainBot *botPackage.Bot, password string) {
 	bot = mainBot
 	configPassword = password
 
