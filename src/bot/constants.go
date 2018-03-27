@@ -1,6 +1,5 @@
 package bot
 
-
 const habrArticleRegexPattern = "(?:https://|)habrahabr.ru/(?:post|company/\\w+/blog)/\\d{1,6}(?:/|)"
 const geekArticleRegexPattern = "(?:https://|)geektimes.ru/(?:post|company/\\w+/blog)/\\d{1,6}(?:/|)"
 
@@ -39,8 +38,7 @@ const helpText = `
 <a href= 'http://telegra.ph/Kak-polzovatsya-unofficial-habr-bot-03-09'>Дополнительная информация</a>
 `
 
-const botFatherCommands =
-`
+const botFatherCommands = `
 help - показать помощь
 habr_tags - показать список тегов
 habr_add_tags - добавить теги
