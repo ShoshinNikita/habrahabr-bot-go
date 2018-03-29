@@ -16,45 +16,44 @@ import (
 	"gopkg.in/telegram-bot-api.v4"  // Telegram api
 
 	"logging"
+	"config"
 )
 
 
 // Bot надстрройка над tgbotapi.BotAPI
 type Bot struct {
-	botAPI *tgbotapi.BotAPI
-	config ConfigData
-	db     *sql.DB
+	botAPI 	*tgbotapi.BotAPI
+	db		*sql.DB
 
 	// Каналы
-	startChan       chan userCommand
-	helpChan        chan *tgbotapi.Message
+	startChan	   	chan userCommand
+	helpChan		chan *tgbotapi.Message
 	stopMailoutChan chan userCommand
-	getTagsChan     chan userCommand
-	addTagsChan     chan userCommand
-	delTagsChan     chan userCommand
+	getTagsChan		chan userCommand
+	addTagsChan		chan userCommand
+	delTagsChan		chan userCommand
 	delAllTagsChan  chan userCommand
-	copyTagsChan    chan userCommand
-	sendIVChan      chan userCommand
-	getBestChan     chan userCommand
+	copyTagsChan	chan userCommand
+	sendIVChan		chan userCommand
+	getBestChan		chan userCommand
 }
 
 
 // NewBot инициализирует бота
-func NewBot(config ConfigData) *Bot {
+func NewBot() *Bot {
 	var err error
 
 	// Инициализация бота
 	var bot Bot
-	bot.config = config
-	bot.botAPI, err = tgbotapi.NewBotAPI(bot.config.Token)
+	bot.botAPI, err = tgbotapi.NewBotAPI(config.Data.BotToken)
 	if err != nil {
-		logging.LogFatalError("main", err)
+		logging.LogFatalError("main", "вызов NewBotAPI()", err)
 	}
 
 	// Инициализация SQLite db
 	db, err := sql.Open("sqlite3", "data/database.db")
 	if err != nil {
-		logging.LogFatalError("main", err)
+		logging.LogFatalError("main", "попытка открыть базу данных", err)
 	}
 	bot.db = db
 
@@ -82,21 +81,21 @@ func (bot *Bot) StartPooling() {
 	go bot.start(bot.startChan)
 	go bot.help(bot.helpChan)
 	go bot.stopMailoutForUser(bot.stopMailoutChan)
-	go bot.mailout(bot.config)
+	go bot.mailout()
 	go bot.returnTags(bot.getTagsChan)
 	go bot.addTags(bot.addTagsChan)
 	go bot.delTags(bot.delTagsChan)
 	go bot.delAllTags(bot.delAllTagsChan)
-	go bot.getBest(bot.getBestChan, bot.config)
+	go bot.getBest(bot.getBestChan)
 	go bot.copyTags(bot.copyTagsChan)
-	go bot.sendIV(bot.sendIVChan, bot.config)
+	go bot.sendIV(bot.sendIVChan)
 
 	// Главный цикл
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 60
 	updateChannel, err := bot.botAPI.GetUpdatesChan(updateConfig)
 	if err != nil {
-		logging.LogFatalError("main", err)
+		logging.LogFatalError("main", "попытка получить GetUpdatesChan",  err)
 	}
 
 	for update := range updateChannel {
@@ -119,6 +118,8 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 
 	command := message.Command()
 	if command == "" {
+		logging.LogRequest(logging.RequestData{Command: "InstantView", Username: message.Chat.UserName})
+		
 		if res, _ := regexp.MatchString(habrArticleRegexPattern, message.Text); res {
 			bot.sendIVChan <- userCommand{message, habr}
 			isRightCommand = true
@@ -127,6 +128,9 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 			isRightCommand = true
 		}
 	} else {
+		// Логгирование запроса
+		logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName})
+
 		// Рассматривается отдельно, т.к. команда используется без префиксов
 		if command == "help" {
 			bot.helpChan <- message
@@ -188,32 +192,25 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 
 // Notify отправляет пользователям сообщение, полученное через сайт
 func (bot *Bot) Notify(sMessage string) {
-	var counter int // Следит за тем, чтобы не было отправлено больше maxArticlesLimit сообщений в секунду
-
 	rows, err := bot.db.Query(`SELECT id FROM users`)
 	if err != nil {
-		logging.LogMinorError("Notify", err)
+		logging.LogMinorError("Notify", "попытка получить список пользователей", err)
 		return
 	}
 	var id int64
 	for rows.Next() {
 		rows.Scan(&id)
+
 		message := tgbotapi.NewMessage(id, sMessage)
 		message.ParseMode = "HTML"
 		bot.send(message)
-
-		counter++
-		if counter >= maxArticlesLimit {
-			counter = 0
-			time.Sleep(time.Second)
-		}
 	}
 }
 
 
 // send отправляет сообщение
-func (bot *Bot) send(msg tgbotapi.MessageConfig) (tgbotapi.Message, error) {
-	return bot.botAPI.Send(msg)
+func (bot *Bot) send(msg tgbotapi.MessageConfig) {
+	bot.botAPI.Send(msg)
 }
 
 
@@ -238,15 +235,27 @@ func (bot *Bot) start(data chan userCommand) {
 
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err, 
+									Username: msg.Chat.UserName, 
+									UserID: msg.Chat.ID,
+									Command: "/start",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
+
 		// Создание пользователя
 		_, err = tx.Exec(`INSERT OR IGNORE INTO users(id) VALUES(?)`, msg.Chat.ID)
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err, 
+									Username: msg.Chat.UserName, 
+									UserID: msg.Chat.ID,
+									Command: "/start",
+									AddInfo: "попытка создать пользователя" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
+
 		switch site {
 		case "":
 			_, err = startMailout(tx, msg.Chat.ID)
@@ -256,16 +265,18 @@ func (bot *Bot) start(data chan userCommand) {
 			_, err = startGeekMailout(tx, msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/start",
+									AddInfo: "попытка поменять значения habr_is_stop (geek_is_stop)" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Привет, " + msg.Chat.UserName + "! Введи /help для справки")
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -275,10 +286,7 @@ func (bot *Bot) help(data chan *tgbotapi.Message) {
 	for msg := range data {
 		message := tgbotapi.NewMessage(msg.Chat.ID, helpText)
 		message.ParseMode = "HTML"
-		_, err := bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{Err: err, Username: msg.Chat.UserName, UserID: msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -291,6 +299,7 @@ func (bot *Bot) returnTags(data chan userCommand) {
 	getGeekTags := func(id int64) (*sql.Rows, error) {
 		return bot.db.Query(`SELECT geek_tags FROM users WHERE id=?`, id)
 	}
+
 	var rows *sql.Rows
 	var err error
 	var msg *tgbotapi.Message
@@ -307,7 +316,12 @@ func (bot *Bot) returnTags(data chan userCommand) {
 		}
 
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...get_tags",
+				AddInfo: "попытка получить теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		var tags string
@@ -324,10 +338,7 @@ func (bot *Bot) returnTags(data chan userCommand) {
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -369,7 +380,12 @@ func (bot *Bot) addTags(data chan userCommand) {
 			rows, err = getGeekTags(msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...add_tags",
+									AddInfo: "попытка получить теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 
@@ -394,7 +410,12 @@ func (bot *Bot) addTags(data chan userCommand) {
 
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...add_tags",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		switch site {
@@ -404,7 +425,12 @@ func (bot *Bot) addTags(data chan userCommand) {
 			_, err = changeGeekTags(tx, strUserTags, msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...add_tags",
+									AddInfo: "попытка поменять теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
@@ -417,10 +443,7 @@ func (bot *Bot) addTags(data chan userCommand) {
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -454,6 +477,7 @@ func (bot *Bot) delTags(data chan userCommand) {
 			logging.SendErrorToUser("список тегов не может быть пустым", bot.botAPI, msg.Chat.ID)
 			continue
 		}
+
 		switch site {
 		case habr:
 			rows, err = getHabrTags(msg.Chat.ID)
@@ -461,7 +485,12 @@ func (bot *Bot) delTags(data chan userCommand) {
 			rows, err = getGeekTags(msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...del_tags",
+				AddInfo: "попытка получить теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 
@@ -485,7 +514,12 @@ func (bot *Bot) delTags(data chan userCommand) {
 
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...del_tags",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		switch site {
@@ -495,7 +529,12 @@ func (bot *Bot) delTags(data chan userCommand) {
 			_, err = changeGeekTags(tx, strUserTags, msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...del_tags",
+				AddInfo: "попытка поменять теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
@@ -508,10 +547,7 @@ func (bot *Bot) delTags(data chan userCommand) {
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -533,7 +569,12 @@ func (bot *Bot) delAllTags(data chan userCommand) {
 		site = command.site
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...del_all_tags",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		switch site {
@@ -543,16 +584,18 @@ func (bot *Bot) delAllTags(data chan userCommand) {
 			_, err = delGeekTags(tx, msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...del_all_tags",
+				AddInfo: "попытка удалить теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Список тегов очищен")
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -592,7 +635,12 @@ func (bot *Bot) copyTags(data chan userCommand) {
 		// Загрузка сайта
 		resp, err := soup.Get(userURL)
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...copy_tags",
+									AddInfo: "попытка загрузить сайт" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 
@@ -628,7 +676,12 @@ func (bot *Bot) copyTags(data chan userCommand) {
 
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...copy_tags",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		switch site {
@@ -640,7 +693,12 @@ func (bot *Bot) copyTags(data chan userCommand) {
 			}
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+								Username: msg.Chat.UserName,
+								UserID: msg.Chat.ID,
+								Command: "/...copy_tags",
+								AddInfo: "попытка поменять теги" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
@@ -648,10 +706,7 @@ func (bot *Bot) copyTags(data chan userCommand) {
 		text := "Теги обновлены. Список тегов:\n* " + strings.Replace(strUserTags, " ", "\n* ", -1)
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
@@ -674,7 +729,12 @@ func (bot *Bot) stopMailoutForUser(data chan userCommand) {
 
 		tx, err := bot.db.Begin()
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...stop",
+									AddInfo: "попытка начать транзакцию" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		switch site {
@@ -684,22 +744,24 @@ func (bot *Bot) stopMailoutForUser(data chan userCommand) {
 			_, err = stopGeekMailout(tx, msg.Chat.ID)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+									Username: msg.Chat.UserName,
+									UserID: msg.Chat.ID,
+									Command: "/...stop",
+									AddInfo: "попытка обновить запись" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		tx.Commit()
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Рассылка приостановлена")
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
 
 // sendIV отправляет пользователю ссылку на статью, которую он прислал, в виде InstantView
-func (bot *Bot) sendIV(data chan userCommand, config ConfigData) {
+func (bot *Bot) sendIV(data chan userCommand) {
 	habrRegexpPattern, _ := regexp.Compile(habrArticleRegexPattern)
 	geekRegexpPattern, _ := regexp.Compile(geekArticleRegexPattern)
 
@@ -729,17 +791,14 @@ func (bot *Bot) sendIV(data chan userCommand, config ConfigData) {
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
 		message.ParseMode = "HTML"
-		_, err := bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
 
 // getBest отправляет пользователю лучшие статьи за сегодняшний день.
 // По-умолчанию – 5, если пользователь указал другое число - другое
-func (bot *Bot) getBest(data chan userCommand, config ConfigData) {
+func (bot *Bot) getBest(data chan userCommand) {
 	parser := gofeed.NewParser()
 
 	var msg *tgbotapi.Message
@@ -759,7 +818,12 @@ func (bot *Bot) getBest(data chan userCommand, config ConfigData) {
 			feed, err = parser.ParseURL(bestGeekArticlesURL)
 		}
 		if err != nil {
-			logging.LogErrorAndNotify(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID}, bot.botAPI)
+			data := logging.ErrorData{Error: err,
+										Username: msg.Chat.UserName,
+										UserID: msg.Chat.ID,
+										Command: "/...best",
+										AddInfo: "попытка распарсить RSS-ленту" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 		bestArticles := "<b>Лучшие статьи за этот день:</b>\n"
@@ -782,61 +846,54 @@ func (bot *Bot) getBest(data chan userCommand, config ConfigData) {
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, bestArticles)
 		message.ParseMode = "HTML"
-		_, err = bot.send(message)
-		if err != nil {
-			logging.LogSendingError(logging.ErrorData{err, msg.Chat.UserName, msg.Chat.ID})
-		}
+		bot.send(message)
 	}
 }
 
 
 // mailout рассылает статьи с периодичностью config.Delay наносекунд
-func (bot *Bot) mailout(config ConfigData) {
+func (bot *Bot) mailout() {
 	var lastTime LastArticlesTime
 
 	// Чтение LastTime
-	raw, err := ioutil.ReadFile("./data/lastArticleTime.json")
+	raw, err := ioutil.ReadFile("data/lastArticleTime.json")
 	if err != nil {
-		logging.LogFatalError("Mailout", err)
+		logging.LogFatalError("Mailout", "попытка прочесть lastArticleTime.json", err)
 	}
 	json.Unmarshal(raw, &lastTime)
 
 	// Таймер
-	ticker := time.NewTicker(time.Duration(config.Delay))
+	ticker := time.NewTicker(time.Duration(config.Data.Delay))
 
 	// Первый раз статьи отправляются сразу
 	for ; true; <-ticker.C {
 		logging.LogEvent("Рассылка статей с Habrahabr")
 		err = habrMailout(bot, &lastTime)
 		if err != nil {
-			logging.LogMinorError("habrMailout", err)
+			logging.LogMinorError("habrMailout", "вызов habrMailout", err)
 		}
+		logging.LogEvent("Завершена")
 
 		logging.LogEvent("Рассылка статей с Geektimes")
 		err = geekMailout(bot, &lastTime)
 		if err != nil {
-			logging.LogMinorError("geekMailout", err)
+			logging.LogMinorError("geekMailout", "вызов geekMailout", err)
 		}
+		logging.LogEvent("Завершена")
 
 		// Перезапись времени
-		raw, err = json.Marshal(lastTime)
+		raw, _ = json.Marshal(lastTime)
+		err = ioutil.WriteFile("./data/lastArticleTime.json", raw, 0644)
 		if err != nil {
-			logging.LogMinorError("Mailout", err)
-		} else {
-			err = ioutil.WriteFile("./data/lastArticleTime.json", raw, 0644)
-			if err != nil {
-				logging.LogFatalError("Mailout", err)
-			}
+			logging.LogFatalError("Mailout", "попытка записать файл lastArticleTime.json", err)
 		}
+		
 	}
 }
 
 
 // habrMailout отвечает за рассылку статей с сайта Habrahabr.ru
 func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
-	// Подсчитывает количество отправленных статей за 1 цикл рассылки. Если превышает 25, то бот засыпает на 1 с
-	counterSendedArticles := 0
-
 	// Parser
 	parser := gofeed.NewParser()
 
@@ -851,7 +908,7 @@ func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
 	for _, item := range feed.Items {
 		articleTime, err := time.Parse(time.RFC1123, item.Published)
 		if err != nil {
-			logging.LogMinorError("Mailout", err)
+			logging.LogMinorError("Mailout", "", err)
 			continue
 		}
 		// Проверка, была ли статья опубликована позже, чем была последняя проверка RSS-ленты
@@ -908,28 +965,16 @@ func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
 					for _, userTag := range userTags {
 						if tag == userTag {
 							shouldSend = true
-							goto loopEnd
 						}
 					}
 				}
-			loopEnd:
 			}
+
 			// Отправка пользователю
 			if shouldSend {
-				counterSendedArticles++
-
 				message := tgbotapi.NewMessage(id, newArticles[i].message)
 				message.ParseMode = "HTML"
-				_, err = bot.send(message)
-				if err != nil {
-					logging.LogSendingError(logging.ErrorData{err, "Empty", id})
-				}
-			}
-
-			// Если превышено количество отправленных статей, то goroutine засыпает на 1 секунду
-			if counterSendedArticles > maxArticlesLimit {
-				counterSendedArticles = 0
-				time.Sleep(time.Second)
+				bot.send(message)
 			}
 		}
 	}
@@ -947,9 +992,6 @@ func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
 
 // geekMailout отвечает за рассылку статей с сайта Geektimes.ru
 func geekMailout(bot *Bot, lastTime *LastArticlesTime) error {
-	// Подсчитывает количество отправленных статей за 1 цикл рассылки. Если превышает 25, то бот засыпает на 1 с
-	counterSendedArticles := 0
-
 	// Parser
 	parser := gofeed.NewParser()
 
@@ -964,7 +1006,7 @@ func geekMailout(bot *Bot, lastTime *LastArticlesTime) error {
 	for _, item := range feed.Items {
 		articleTime, err := time.Parse(time.RFC1123, item.Published)
 		if err != nil {
-			logging.LogMinorError("Mailout", err)
+			logging.LogMinorError("Mailout", "", err)
 			continue
 		}
 		// Проверка, была ли статья опубликована позже, чем была последняя проверка RSS-ленты
@@ -1021,28 +1063,16 @@ func geekMailout(bot *Bot, lastTime *LastArticlesTime) error {
 					for _, userTag := range userTags {
 						if tag == userTag {
 							shouldSend = true
-							goto loopEnd
 						}
 					}
 				}
-			loopEnd:
 			}
+
 			// Отправка пользователю
 			if shouldSend {
-				counterSendedArticles++
-
 				message := tgbotapi.NewMessage(id, newArticles[i].message)
 				message.ParseMode = "HTML"
-				_, err = bot.send(message)
-				if err != nil {
-					logging.LogSendingError(logging.ErrorData{err, "Empty", id})
-				}
-			}
-
-			// Если превышено количество отправленных статей, то goroutine засыпает на 1 секунду
-			if counterSendedArticles > maxArticlesLimit {
-				counterSendedArticles = 0
-				time.Sleep(time.Second)
+				bot.send(message)
 			}
 		}
 	}

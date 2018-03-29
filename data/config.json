@@ -1,0 +1,7 @@
+{
+	"botToken": "",
+	"appToken": "TOKEN FROM advanced-log",
+	"delay": 300000000000,
+	"password": "",
+	"advancedLogUrl": "ADDRESS OF BACKEND OF advanced-log"
+}

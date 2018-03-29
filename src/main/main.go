@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"fmt"
@@ -10,31 +8,29 @@ import (
 	"bot"
 	"logging"
 	"website"
+	"config"
 )
 
 
 func main() {
-	// В первую очередь! Открываются файлы для логов
-	err := logging.OpenLogFiles("logs")
+	// Чтение config.json (В первую очередь!)
+	err := config.ReadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Чтение config.json
-	var config bot.ConfigData
-	logging.LogEvent("Чтение config.json")
-	raw, err := ioutil.ReadFile("./data/config.json")
+	// Инициализация advanced-log
+	err = logging.Initialize()
 	if err != nil {
-		logging.LogFatalError("main", err)
+		log.Fatal(err)
 	}
-	err = json.Unmarshal(raw, &config)
-	if err != nil {
-		logging.LogFatalError("main", err)
-	}
+
+	logging.LogEvent("Старт программы")
+	
 
 	// Инициализация бота
 	logging.LogEvent("Инициализация бота")
-	habrBot := bot.NewBot(config)
+	habrBot := bot.NewBot()
 	
 	args := os.Args[1:]
 	if len(args) == 0 {
@@ -43,7 +39,7 @@ func main() {
 		go habrBot.StartPooling()
 
 		logging.LogEvent("Запуск сайта")
-		go website.RunSite(habrBot, config.SitePassword)
+		go website.RunSite(habrBot)
 
 	} else if args[0] == "-bot" {
 
@@ -53,13 +49,14 @@ func main() {
 	} else if args[0] == "-web" {
 
 		logging.LogEvent("Запуск сайта")
-		go website.RunSite(habrBot, config.SitePassword)
+		go website.RunSite(habrBot)
 
 	} else {
 		fmt.Println("Неверные аргументы")
+		logging.FatalErrorChan <- true
 	}
 
 	// Поток блокируется до появления фатальной ошибки
-	// (канал будет пустым всегда, т.к. при появлении фатальной ошибки программа завершится с кодом 1)
+	// (при появлении фатальной ошибки программа завершится с кодом 1)
 	<- logging.FatalErrorChan
 }

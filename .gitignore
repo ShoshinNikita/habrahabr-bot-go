@@ -5,9 +5,4 @@
 pkg
 *debug
 *debug.test
-src/main/data
-src/main/logs
 production/
-*_test.go
-*.sh
-*.jpg

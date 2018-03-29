@@ -8,8 +8,6 @@ const geekUserRegexPattern = `^https://geektimes\.ru/users/[\w\s]+/$`
 
 const messageText = "[{source}] {title} <a href='{IV}'>(IV)</a>\n\n<a href='{link}'>Перейти к статье</a>\n\n<a href='{link}#comments'>Перейти к комментариям</a>"
 
-const maxArticlesLimit = 25 // Служит для ограничения отправки статей, чтобы Telegram не заблокировал бота
-
 // ссылка на InstantView с {url} вместо ссылки на статью
 const habrInstantViewURL = "https://t.me/iv?url={url}&rhash=2cb77307aed3b2"
 const geekInstantViewURL = "https://t.me/iv?url={url}&rhash=267de544beb71f"

@@ -6,17 +6,18 @@ import (
 	"net/http"
 
 	botPackage "bot"
+	"config"
 )
 
 var bot *botPackage.Bot
-var configPassword string
+
 
 // sendMessage отправляет сообщение через бота
 func sendMessage(r http.Request) {
 	r.ParseForm()
 	message := r.Form.Get("message")
 	password := r.Form.Get("password")
-	if password == configPassword {
+	if password == config.Data.SitePassword {
 		bot.Notify(message)
 	}
 }
@@ -35,9 +36,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 // RunSite запускает сайт
-func RunSite(mainBot *botPackage.Bot, password string) {
+func RunSite(mainBot *botPackage.Bot) {
 	bot = mainBot
-	configPassword = password
 
 	http.HandleFunc("/", index)
 	http.ListenAndServe(":8080", nil)

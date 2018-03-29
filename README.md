@@ -1,6 +1,6 @@
 # Habrahabr-бот на Go #
 
-Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram
+Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram. Найти бота можно [здесь](https://t.me/unofficial_habr_bot)
 
 ## Требования ##
 
@@ -11,6 +11,7 @@
 	* RSS парсер – [gofeed](https://github.com/mmcdole/gofeed)
 	* Web scraper – [soup](https://github.com/anaskhan96/soup)
 	* Парсер дат и времени – [jodaTime](https://github.com/vjeantet/jodaTime)
+	* Продвинутое логгирование – [advanced-log](https://github.com/ShoshinNikita/advanced-log) и библиотека для Go – [advanced-log-go](https://github.com/ShoshinNikita/advanced-log-go)
 
 ## Информация о работе ##
 
