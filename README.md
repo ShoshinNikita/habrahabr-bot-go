@@ -1,6 +1,6 @@
 # Habrahabr-бот на Go #
 
-Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram. Найти бота можно [здесь](https://t.me/unofficial_habr_bot)
+Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habrahabr.ru/post/350858/)
 
 ## Требования ##
 
@@ -21,25 +21,27 @@
 
 ### Структура папок исходного кода ###
 
-* bot
-	* bot.go – модуль, отвечающий за бота
-	* functions.go – полезные функции
-	* structures.go – структуры, которые используются в боте
-	* constants.go - константы
-* logging
-	* logging.go – отвечает за логгирование всего, что происходит в программе
-* main
-	* data
-		* config.json
-		* database.db
-		* lastArticleTime.json
-	* logs
-		* Log-файлы (создаются автоматически)
-	* templates
-		* index.html - страница отправки сообщений
-	* main.go – главный файл
-* website
-	* website.go – модуль, отвечающая за сайт
+* src
+	* bot
+		* bot.go – модуль, отвечающий за бота
+		* functions.go – полезные функции
+		* structures.go – структуры, которые используются в боте
+		* constants.go - константы
+	* config
+		* config.go – хранит конфигурационную информацию
+	* logging
+		* logging.go – отвечает за логгирование всего, что происходит в программе
+	* main
+		* main.go – главный файл
+	* website
+		* website.go – модуль, отвечающая за сайт
+* data
+	* config.json
+	* database.db
+	* lastArticleTime.json
+* templates
+	* index.html - страница отправки сообщений
+* stuff – содержит разные материалы
 
 ### Содержание файлов ###
 
@@ -47,9 +49,11 @@
 
 ```json
 {
-	"token": "***BOT TOKEN***",
+	"botToken": "***BOT TOKEN***",
+	"appToken": "***APP TOKEN IN ADVANCED LOG***",
 	"delay": "***TIME IN NANOSECONDS***",
-	"password": "***PASSWORD FOR WEBSITE***"
+	"password": "***PASSWORD FOR WEBSITE***",
+	"advancedLogUrl": "***URL TO ADVANCED LOG***"
 }
 ```
 
