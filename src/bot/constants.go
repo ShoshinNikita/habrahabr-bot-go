@@ -1,11 +1,10 @@
 package bot
 
+const habrArticleRegexPattern = `(https://)?habrahabr\.ru/(post|company/\w+/blog)?/\d{1,6}/?`
+const geekArticleRegexPattern = `(https://)?geektimes\.ru/(post|company/\w+/blog)?/\d{1,6}/?`
 
-const habrArticleRegexPattern = "(?:https://|)habrahabr.ru/(?:post|company/\\w+/blog)/\\d{1,6}(?:/|)"
-const geekArticleRegexPattern = "(?:https://|)geektimes.ru/(?:post|company/\\w+/blog)/\\d{1,6}(?:/|)"
-
-const habrUserRegexPattern = "^https://habrahabr.ru/users/[\\w\\s_]+/$"
-const geekUserRegexPattern = "^https://geektimes.ru/users/[\\w\\s_]+/$"
+const habrUserRegexPattern = `^https://habrahabr\.ru/users/[\w\s]+/$`
+const geekUserRegexPattern = `^https://geektimes\.ru/users/[\w\s]+/$`
 
 const messageText = "[{source}] {title} <a href='{IV}'>(IV)</a>\n\n<a href='{link}'>Перейти к статье</a>\n\n<a href='{link}#comments'>Перейти к комментариям</a>"
 
@@ -39,8 +38,7 @@ const helpText = `
 <a href= 'http://telegra.ph/Kak-polzovatsya-unofficial-habr-bot-03-09'>Дополнительная информация</a>
 `
 
-const botFatherCommands =
-`
+const botFatherCommands = `
 help - показать помощь
 habr_tags - показать список тегов
 habr_add_tags - добавить теги
