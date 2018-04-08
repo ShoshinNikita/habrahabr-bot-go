@@ -1,0 +1,11 @@
+#!/bin/bash
+# Script for launching habrahabr_bot
+
+./habrahabr_bot \
+-aToken=TOKEN FROM advanced-log \
+-bToken=BOT TOKEN \
+-debug=true \
+-logUrl=http://127.0.0.1:23000 \
+-pass=PASSWORD \
+-timePath=data/lastArticleTime.json \
+-dbPath=data/database.db \

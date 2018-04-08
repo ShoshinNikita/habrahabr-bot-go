@@ -1,41 +1,40 @@
 package bot
 
-
 import (
-	"database/sql" // database
+	"errors"
 	"encoding/json"
-	"io/ioutil" // чтение файлов
+	"io/ioutil" 					// чтение файлов
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/anaskhan96/soup"	// html parser
-	_ "github.com/mattn/go-sqlite3" // sql
 	"github.com/mmcdole/gofeed" 	// Rss parser
-	"gopkg.in/telegram-bot-api.v4"  // Telegram api
+	"gopkg.in/telegram-bot-api.v4" 	// Telegram api
 
-	"logging"
+	"logging"						// логгирование
 	"config"
+	"db"							// взаимодействие с базой данных
 )
 
 
 // Bot надстрройка над tgbotapi.BotAPI
 type Bot struct {
 	botAPI 	*tgbotapi.BotAPI
-	db		*sql.DB
 
 	// Каналы
-	startChan	   	chan userCommand
-	helpChan		chan *tgbotapi.Message
-	stopMailoutChan chan userCommand
-	getTagsChan		chan userCommand
-	addTagsChan		chan userCommand
-	delTagsChan		chan userCommand
-	delAllTagsChan  chan userCommand
-	copyTagsChan	chan userCommand
-	sendIVChan		chan userCommand
-	getBestChan		chan userCommand
+	startChan	 		chan *tgbotapi.Message
+	startMailoutChan	chan userCommand
+	helpChan			chan *tgbotapi.Message
+	stopMailoutChan 	chan userCommand
+	getStatusChan		chan userCommand
+	addTagsChan			chan userCommand
+	delTagsChan			chan userCommand
+	delAllTagsChan		chan userCommand
+	copyTagsChan		chan userCommand
+	sendIVChan			chan userCommand
+	getBestChan			chan userCommand
 }
 
 
@@ -47,23 +46,17 @@ func NewBot() *Bot {
 	var bot Bot
 	bot.botAPI, err = tgbotapi.NewBotAPI(config.Data.BotToken)
 	if err != nil {
-		logging.LogFatalError("main", "вызов NewBotAPI()", err)
+		logging.LogFatalError("NewBot", "вызов NewBotAPI()", err)
 	}
-
-	// Инициализация SQLite db
-	db, err := sql.Open("sqlite3", "data/database.db")
-	if err != nil {
-		logging.LogFatalError("main", "попытка открыть базу данных", err)
-	}
-	bot.db = db
 
 	bot.botAPI.Buffer = 12 * 50
 
 	// Инициализация каналов
-	bot.startChan = 		make(chan userCommand, 50)
-	bot.helpChan =  		make(chan *tgbotapi.Message, 50)
-	bot.stopMailoutChan =   make(chan userCommand, 50)
-	bot.getTagsChan = 		make(chan userCommand, 50)
+	bot.startChan = 		make(chan *tgbotapi.Message, 50)
+	bot.startMailoutChan =	make(chan userCommand, 50)
+	bot.helpChan =			make(chan *tgbotapi.Message, 50)
+	bot.stopMailoutChan =	make(chan userCommand, 50)
+	bot.getStatusChan = 	make(chan userCommand, 50)
 	bot.addTagsChan = 		make(chan userCommand, 50)
 	bot.delTagsChan = 		make(chan userCommand, 50)
 	bot.delAllTagsChan = 	make(chan userCommand, 50)
@@ -79,10 +72,11 @@ func NewBot() *Bot {
 func (bot *Bot) StartPooling() {
 	// Goroutines
 	go bot.start(bot.startChan)
+	go bot.startMailout(bot.startMailoutChan)
 	go bot.help(bot.helpChan)
 	go bot.stopMailoutForUser(bot.stopMailoutChan)
 	go bot.mailout()
-	go bot.returnTags(bot.getTagsChan)
+	go bot.getStatus(bot.getStatusChan)
 	go bot.addTags(bot.addTagsChan)
 	go bot.delTags(bot.delTagsChan)
 	go bot.delAllTags(bot.delAllTagsChan)
@@ -95,7 +89,7 @@ func (bot *Bot) StartPooling() {
 	updateConfig.Timeout = 60
 	updateChannel, err := bot.botAPI.GetUpdatesChan(updateConfig)
 	if err != nil {
-		logging.LogFatalError("main", "попытка получить GetUpdatesChan",  err)
+		logging.LogFatalError("NewBot", "попытка получить GetUpdatesChan", err)
 	}
 
 	for update := range updateChannel {
@@ -119,7 +113,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 	command := message.Command()
 	if command == "" {
 		logging.LogRequest(logging.RequestData{Command: "InstantView", Username: message.Chat.UserName})
-		
+	
 		if res, _ := regexp.MatchString(habrArticleRegexPattern, message.Text); res {
 			bot.sendIVChan <- userCommand{message, habr}
 			isRightCommand = true
@@ -131,27 +125,31 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 		// Логгирование запроса
 		logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName})
 
-		// Рассматривается отдельно, т.к. команда используется без префиксов
+		// Рассматривается отдельно, т.к. команды используется без префиксов
 		if command == "help" {
 			bot.helpChan <- message
 			return true
+		} else if command == "start" {
+			bot.startChan <- message
+			return true
 		}
-		// Если команда == /start, то site==""
-		if command != "start" {
-			// Длина всегда > 5
-			if len(command) <= 5 {
-				return false
-			}
-			if prefix := command[:5]; prefix == "geek_" {
-				site = geek
-			} else if prefix == "habr_" {
-				site = habr
-			}
-			command = command[5:]
+
+		// Длина всегда > 5
+		if len(command) <= 5 {
+			return false
 		}
+		if prefix := command[:5]; prefix == "geek_" {
+			site = geek
+		} else if prefix == "habr_" {
+			site = habr
+		} else {
+			return false
+		}
+		command = command[5:]
+		
 		switch command {
 			case "start": {
-				bot.startChan <- userCommand{message, site}
+				bot.startMailoutChan <- userCommand{message, site}
 				isRightCommand = true
 			}
 			case "stop": {
@@ -159,7 +157,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 				isRightCommand = true
 			}
 			case "tags": {
-				bot.getTagsChan <- userCommand{message, site}
+				bot.getStatusChan <- userCommand{message, site}
 				isRightCommand = true
 			}
 			case "add_tags": {
@@ -184,6 +182,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 				isRightCommand = true
 			}
 		}
+		
 	}
 
 	return isRightCommand
@@ -192,16 +191,14 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 
 // Notify отправляет пользователям сообщение, полученное через сайт
 func (bot *Bot) Notify(sMessage string) {
-	rows, err := bot.db.Query(`SELECT id FROM users`)
+	users, err := db.GetAllUsers()
 	if err != nil {
 		logging.LogMinorError("Notify", "попытка получить список пользователей", err)
 		return
 	}
-	var id int64
-	for rows.Next() {
-		rows.Scan(&id)
 
-		message := tgbotapi.NewMessage(id, sMessage)
+	for _, user := range users {
+		message := tgbotapi.NewMessage(user.ID, sMessage)
 		message.ParseMode = "HTML"
 		bot.send(message)
 	}
@@ -215,17 +212,29 @@ func (bot *Bot) send(msg tgbotapi.MessageConfig) {
 
 
 // start отвечает на команду /start, создаёт запись о пользователе
-func (bot *Bot) start(data chan userCommand) {
-	startMailout := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_is_stop=0, geek_is_stop=0 WHERE id=?`, id)
-	}
-	startHabrMailout := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_is_stop=0 WHERE id=?`, id)
-	}
-	startGeekMailout := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_is_stop=0 WHERE id=?`, id)
-	}
+func (bot *Bot) start(data chan *tgbotapi.Message) {
+	for msg := range data {
+		// Создание пользователя
+		err := db.CreateUser(strconv.FormatInt(msg.Chat.ID, 10))
+		if err != nil {
+			data := logging.ErrorData{
+				Error: err, 
+				Username: msg.Chat.UserName, 
+				UserID: msg.Chat.ID,
+				Command: "/start",
+				AddInfo: "попытка создать пользователя" }
+			logging.LogErrorAndNotify(data, bot.botAPI)
+			continue
+		}
 
+		message := tgbotapi.NewMessage(msg.Chat.ID, "Привет, " + msg.Chat.UserName + "! Введи /help для справки")
+		bot.send(message)
+	}
+}
+
+
+// startMailout включает рассылку
+func (bot *Bot) startMailout(data chan userCommand) {
 	var msg *tgbotapi.Message
 	var site string
 
@@ -233,49 +242,25 @@ func (bot *Bot) start(data chan userCommand) {
 		msg = command.message
 		site = command.site
 
-		tx, err := bot.db.Begin()
+		var err error
+		if site == habr {
+			err = db.StartMailout(strconv.FormatInt(msg.Chat.ID, 10), habr)
+		} else if site == geek {
+			err = db.StartMailout(strconv.FormatInt(msg.Chat.ID, 10), geek)
+		}
+
 		if err != nil {
-			data := logging.ErrorData{Error: err, 
-									Username: msg.Chat.UserName, 
-									UserID: msg.Chat.ID,
-									Command: "/start",
-									AddInfo: "попытка начать транзакцию" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/start_mailout",
+				AddInfo: "попытка включить рассылку для " + site}	
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
 
-		// Создание пользователя
-		_, err = tx.Exec(`INSERT OR IGNORE INTO users(id) VALUES(?)`, msg.Chat.ID)
-		if err != nil {
-			data := logging.ErrorData{Error: err, 
-									Username: msg.Chat.UserName, 
-									UserID: msg.Chat.ID,
-									Command: "/start",
-									AddInfo: "попытка создать пользователя" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-
-		switch site {
-		case "":
-			_, err = startMailout(tx, msg.Chat.ID)
-		case habr:
-			_, err = startHabrMailout(tx, msg.Chat.ID)
-		case geek:
-			_, err = startGeekMailout(tx, msg.Chat.ID)
-		}
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/start",
-									AddInfo: "попытка поменять значения habr_is_stop (geek_is_stop)" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		tx.Commit()
-
-		message := tgbotapi.NewMessage(msg.Chat.ID, "Привет, " + msg.Chat.UserName + "! Введи /help для справки")
+		message := tgbotapi.NewMessage(msg.Chat.ID, "Рассылка для " + site + " включена")
 		bot.send(message)
 	}
 }
@@ -291,50 +276,56 @@ func (bot *Bot) help(data chan *tgbotapi.Message) {
 }
 
 
-// returnTags возвращает теги пользователя
-func (bot *Bot) returnTags(data chan userCommand) {
-	getHabrTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT habr_tags FROM users WHERE id=?`, id)
-	}
-	getGeekTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT geek_tags FROM users WHERE id=?`, id)
-	}
-
-	var rows *sql.Rows
-	var err error
+// getStatus возвращает теги пользователя и информация, осуществляется ли рассылка
+func (bot *Bot) getStatus(data chan userCommand) {
 	var msg *tgbotapi.Message
 	var site string
 
 	for command := range data {
 		msg = command.message
 		site = command.site
-		switch site {
-		case habr:
-			rows, err = getHabrTags(msg.Chat.ID)
-		case geek:
-			rows, err = getGeekTags(msg.Chat.ID)
-		}
 
+		user, err := db.GetUser(strconv.FormatInt(msg.Chat.ID, 10))
 		if err != nil {
-			data := logging.ErrorData{Error: err,
+			data := logging.ErrorData{
+				Error: err,
 				Username: msg.Chat.UserName,
 				UserID: msg.Chat.ID,
-				Command: "/...get_tags",
-				AddInfo: "попытка получить теги" }
+				Command: "/...tags",
+				AddInfo: "попытка получить данные пользователя" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-		var tags string
-		for rows.Next() {
-			rows.Scan(&tags)
+
+		var tags []string
+		if site == habr {
+			tags = user.HabrTags
+		} else if site == geek {
+			tags = user.GeekTags
 		}
-		rows.Close()
 
 		var text string
-		if tags == "" {
+		if len(tags) == 0 {
 			text = "Список тегов пуст"
 		} else {
-			text = "Список тегов:\n* " + strings.Replace(tags, " ", "\n* ", -1)
+			text = "Список тегов:\n* "
+			text += strings.Join(tags, "\n* ")
+		}
+
+		text += "\n\n📬 Рассылка: "
+
+		if site == habr {
+			if user.HabrMailout {
+				text += "осуществляется"
+			} else {
+				text += "не осуществляется"
+			}
+		} else if site == geek {
+			if user.GeekMailout {
+				text += "осуществляется"
+			} else {
+				text += "не осуществляется"
+			}
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
@@ -345,22 +336,6 @@ func (bot *Bot) returnTags(data chan userCommand) {
 
 // addTags добавляет теги, которые прислал пользователь
 func (bot *Bot) addTags(data chan userCommand) {
-	getHabrTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT habr_tags FROM users WHERE id=?`, id)
-	}
-	getGeekTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT geek_tags FROM users WHERE id=?`, id)
-	}
-
-	changeHabrTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_tags=? WHERE id=?`, newTags, id)
-	}
-	changeGeekTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_tags=? WHERE id=?`, newTags, id)
-	}
-
-	var rows *sql.Rows
-	var err error
 	var msg *tgbotapi.Message
 	var site string
 
@@ -368,78 +343,36 @@ func (bot *Bot) addTags(data chan userCommand) {
 		msg = command.message
 		site = command.site
 
-		if msg.CommandArguments() == "" {
+		newTags := strings.Split(strings.ToLower(msg.CommandArguments()), " ")
+		if len(newTags) == 0 {
 			logging.SendErrorToUser("список тегов не может быть пустым", bot.botAPI, msg.Chat.ID)
 			continue
 		}
 
-		switch site {
-		case habr:
-			rows, err = getHabrTags(msg.Chat.ID)
-		case geek:
-			rows, err = getGeekTags(msg.Chat.ID)
+		var updatedTags []string
+		var err error
+		if site == habr {
+			updatedTags, err = db.AddUserTags(strconv.FormatInt(msg.Chat.ID, 10), habr, newTags)
+		} else if site == geek {
+			updatedTags, err = db.AddUserTags(strconv.FormatInt(msg.Chat.ID, 10), geek, newTags)
 		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...add_tags",
-									AddInfo: "попытка получить теги" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...add_tags",
+				AddInfo: "попытка добавить теги" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-
-		var strOldTags string
-		for rows.Next() {
-			rows.Scan(&strOldTags)
-		}
-		rows.Close()
-
-		newTags := getTagsFromString(strings.ToLower(msg.CommandArguments()))
-		userTags := getTagsFromString(strOldTags)
-
-		for k := range newTags {
-			userTags[k] = true
-		}
-
-		var strUserTags string // Обновлённые теги
-		for k := range userTags {
-			strUserTags += k + " "
-		}
-		strUserTags = strings.TrimSuffix(strUserTags, " ")
-
-		tx, err := bot.db.Begin()
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...add_tags",
-									AddInfo: "попытка начать транзакцию" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		switch site {
-		case habr:
-			_, err = changeHabrTags(tx, strUserTags, msg.Chat.ID)
-		case geek:
-			_, err = changeGeekTags(tx, strUserTags, msg.Chat.ID)
-		}
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...add_tags",
-									AddInfo: "попытка поменять теги" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		tx.Commit()
 
 		var text string
-		if strUserTags == "" {
+		if len(updatedTags) == 0 {
 			text = "Список тегов пуст"
 		} else {
-			text = "Теги обновлены. Список тегов:\n* " + strings.Replace(strUserTags, " ", "\n* ", -1)
+			text = "Список тегов:\n* "
+			text += strings.Join(updatedTags, "\n* ")
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
@@ -450,22 +383,6 @@ func (bot *Bot) addTags(data chan userCommand) {
 
 // delTags удаляет теги, которые прислал пользователь
 func (bot *Bot) delTags(data chan userCommand) {
-	getHabrTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT habr_tags FROM users WHERE id=?`, id)
-	}
-	getGeekTags := func(id int64) (*sql.Rows, error) {
-		return bot.db.Query(`SELECT geek_tags FROM users WHERE id=?`, id)
-	}
-
-	changeHabrTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_tags=? WHERE id=?`, newTags, id)
-	}
-	changeGeekTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_tags=? WHERE id=?`, newTags, id)
-	}
-
-	var rows *sql.Rows
-	var err error
 	var msg *tgbotapi.Message
 	var site string
 
@@ -473,77 +390,36 @@ func (bot *Bot) delTags(data chan userCommand) {
 		msg = command.message
 		site = command.site
 
-		if msg.CommandArguments() == "" {
+		tagsForDel := strings.Split(strings.ToLower(msg.CommandArguments()), " ")
+		if len(tagsForDel) == 0 {
 			logging.SendErrorToUser("список тегов не может быть пустым", bot.botAPI, msg.Chat.ID)
 			continue
 		}
 
-		switch site {
-		case habr:
-			rows, err = getHabrTags(msg.Chat.ID)
-		case geek:
-			rows, err = getGeekTags(msg.Chat.ID)
+		var updatedTags []string
+		var err error 
+		if site == habr {
+			updatedTags, err = db.DelUserTags(strconv.FormatInt(msg.Chat.ID, 10), habr, tagsForDel)
+		} else if site == geek {
+			updatedTags, err = db.DelUserTags(strconv.FormatInt(msg.Chat.ID, 10), geek, tagsForDel)
 		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
+			data := logging.ErrorData{
+				Error: err,
 				Username: msg.Chat.UserName,
 				UserID: msg.Chat.ID,
 				Command: "/...del_tags",
-				AddInfo: "попытка получить теги" }
+				AddInfo: "попытка удалить теги" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-
-		var strOldTags string
-		for rows.Next() {
-			rows.Scan(&strOldTags)
-		}
-		rows.Close()
-
-		tagsForDel := getTagsFromString(strings.ToLower(msg.CommandArguments()))
-		userTags := getTagsFromString(strOldTags)
-		for k := range tagsForDel {
-			delete(userTags, k)
-		}
-
-		var strUserTags string // Обновлённые теги
-		for k := range userTags {
-			strUserTags += k + " "
-		}
-		strUserTags = strings.TrimSuffix(strUserTags, " ")
-
-		tx, err := bot.db.Begin()
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...del_tags",
-									AddInfo: "попытка начать транзакцию" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		switch site {
-		case habr:
-			_, err = changeHabrTags(tx, strUserTags, msg.Chat.ID)
-		case geek:
-			_, err = changeGeekTags(tx, strUserTags, msg.Chat.ID)
-		}
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-				Username: msg.Chat.UserName,
-				UserID: msg.Chat.ID,
-				Command: "/...del_tags",
-				AddInfo: "попытка поменять теги" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		tx.Commit()
 
 		var text string
-		if strUserTags == "" {
+		if len(updatedTags) == 0 {
 			text = "Список тегов пуст"
 		} else {
-			text = "Теги обновлены. Список тегов:\n* " + strings.Replace(strUserTags, " ", "\n* ", -1)
+			text = "Список тегов:\n* "
+			text += strings.Join(updatedTags, "\n* ")
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
@@ -554,37 +430,22 @@ func (bot *Bot) delTags(data chan userCommand) {
 
 // delAllTags очищает список тегов пользователя
 func (bot *Bot) delAllTags(data chan userCommand) {
-	delHabrTags := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_tags='' WHERE id=?`, id)
-	}
-	delGeekTags := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_tags='' WHERE id=?`, id)
-	}
-
 	var msg *tgbotapi.Message
 	var site string
 
 	for command := range data {
 		msg = command.message
 		site = command.site
-		tx, err := bot.db.Begin()
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...del_all_tags",
-									AddInfo: "попытка начать транзакцию" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		switch site {
-		case habr:
-			_, err = delHabrTags(tx, msg.Chat.ID)
-		case geek:
-			_, err = delGeekTags(tx, msg.Chat.ID)
+
+		var err error
+		if site == habr {
+			err = db.DelAllUserTags(strconv.FormatInt(msg.Chat.ID, 10), habr)
+		} else if site == geek {
+			err = db.DelAllUserTags(strconv.FormatInt(msg.Chat.ID, 10), habr)
 		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
+			data := logging.ErrorData{
+				Error: err,
 				Username: msg.Chat.UserName,
 				UserID: msg.Chat.ID,
 				Command: "/...del_all_tags",
@@ -592,7 +453,6 @@ func (bot *Bot) delAllTags(data chan userCommand) {
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-		tx.Commit()
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Список тегов очищен")
 		bot.send(message)
@@ -602,13 +462,6 @@ func (bot *Bot) delAllTags(data chan userCommand) {
 
 // copyTags копирует теги пользователя со страницы Habrahabr
 func (bot *Bot) copyTags(data chan userCommand) {
-	changeHabrTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_tags=? WHERE id=?`, newTags, id)
-	}
-	changeGeekTags := func(tx *sql.Tx, newTags string, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_tags=? WHERE id=?`, newTags, id)
-	}
-
 	var msg *tgbotapi.Message
 	var site string
 
@@ -635,11 +488,12 @@ func (bot *Bot) copyTags(data chan userCommand) {
 		// Загрузка сайта
 		resp, err := soup.Get(userURL)
 		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...copy_tags",
-									AddInfo: "попытка загрузить сайт" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...copy_tags",
+				AddInfo: "попытка загрузить сайт" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
@@ -656,7 +510,6 @@ func (bot *Bot) copyTags(data chan userCommand) {
 			tag = strings.Replace(tag, " ", "_", -1)
 			userTags = append(userTags, tag)
 		}
-
 		// Получение Блогов компаний
 		tags = doc.FindAll("div", "class", "media-obj__body media-obj__body_list-view list-snippet")
 		for _, tagNode := range tags {
@@ -672,39 +525,27 @@ func (bot *Bot) copyTags(data chan userCommand) {
 			logging.SendErrorToUser("было обнаружено 0 тегов. Должно быть больше", bot.botAPI, msg.Chat.ID)
 			continue
 		}
-		strUserTags := strings.Join(userTags, " ")
-
-		tx, err := bot.db.Begin()
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...copy_tags",
-									AddInfo: "попытка начать транзакцию" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
+		
 		switch site {
 			case habr: {
-				_, err = changeHabrTags(tx, strUserTags, msg.Chat.ID)
+				err = db.UpdateTags(strconv.FormatInt(msg.Chat.ID, 10), habr, userTags)
 			}
 			case geek: {
-				_, err = changeGeekTags(tx, strUserTags, msg.Chat.ID)
+				err = db.UpdateTags(strconv.FormatInt(msg.Chat.ID, 10), habr, userTags)
 			}
 		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
-								Username: msg.Chat.UserName,
-								UserID: msg.Chat.ID,
-								Command: "/...copy_tags",
-								AddInfo: "попытка поменять теги" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...copy_tags",
+				AddInfo: "попытка перезаписать теги" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-		tx.Commit()
 
-		text := "Теги обновлены. Список тегов:\n* " + strings.Replace(strUserTags, " ", "\n* ", -1)
-
+		text := "Теги обновлены. Список тегов:\n* " + strings.Join(userTags, "\n* ")
 		message := tgbotapi.NewMessage(msg.Chat.ID, text)
 		bot.send(message)
 	}
@@ -713,13 +554,6 @@ func (bot *Bot) copyTags(data chan userCommand) {
 
 // stopMailoutForUser останавливает рассылку для пользователя
 func (bot *Bot) stopMailoutForUser(data chan userCommand) {
-	stopHabrMailout := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET habr_is_stop=1 WHERE id=?`, id)
-	}
-	stopGeekMailout := func(tx *sql.Tx, id int64) (sql.Result, error) {
-		return tx.Exec(`UPDATE users SET geek_is_stop=1 WHERE id=?`, id)
-	}
-
 	var msg *tgbotapi.Message
 	var site string
 
@@ -727,32 +561,22 @@ func (bot *Bot) stopMailoutForUser(data chan userCommand) {
 		msg = command.message
 		site = command.site
 
-		tx, err := bot.db.Begin()
+		var err error
+		if site == habr {
+			err = db.StopMailout(strconv.FormatInt(msg.Chat.ID, 10), habr)
+		} else if site == geek {
+			err = db.StopMailout(strconv.FormatInt(msg.Chat.ID, 10), geek)
+		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...stop",
-									AddInfo: "попытка начать транзакцию" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...stop",
+				AddInfo: "попытка остановить рассылку для " + site }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
-		switch site {
-		case habr:
-			_, err = stopHabrMailout(tx, msg.Chat.ID)
-		case geek:
-			_, err = stopGeekMailout(tx, msg.Chat.ID)
-		}
-		if err != nil {
-			data := logging.ErrorData{Error: err,
-									Username: msg.Chat.UserName,
-									UserID: msg.Chat.ID,
-									Command: "/...stop",
-									AddInfo: "попытка обновить запись" }
-			logging.LogErrorAndNotify(data, bot.botAPI)
-			continue
-		}
-		tx.Commit()
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Рассылка приостановлена")
 		bot.send(message)
@@ -818,11 +642,12 @@ func (bot *Bot) getBest(data chan userCommand) {
 			feed, err = parser.ParseURL(bestGeekArticlesURL)
 		}
 		if err != nil {
-			data := logging.ErrorData{Error: err,
-										Username: msg.Chat.UserName,
-										UserID: msg.Chat.ID,
-										Command: "/...best",
-										AddInfo: "попытка распарсить RSS-ленту" }
+			data := logging.ErrorData{
+				Error: err,
+				Username: msg.Chat.UserName,
+				UserID: msg.Chat.ID,
+				Command: "/...best",
+				AddInfo: "попытка распарсить RSS-ленту" }
 			logging.LogErrorAndNotify(data, bot.botAPI)
 			continue
 		}
@@ -856,7 +681,7 @@ func (bot *Bot) mailout() {
 	var lastTime LastArticlesTime
 
 	// Чтение LastTime
-	raw, err := ioutil.ReadFile("data/lastArticleTime.json")
+	raw, err := ioutil.ReadFile(config.Data.PathToTimeFile)
 	if err != nil {
 		logging.LogFatalError("Mailout", "попытка прочесть lastArticleTime.json", err)
 	}
@@ -867,23 +692,46 @@ func (bot *Bot) mailout() {
 
 	// Первый раз статьи отправляются сразу
 	for ; true; <-ticker.C {
+		allUsers, err := db.GetAllUsers()
+		if err != nil {
+			logging.LogMinorError("mailout", "ошибка при попытке получить список всех пользователей", err)
+			continue
+		}
+
+		// Создание списка пользователей, которым нужно отправлять статьи
+		var habrUsers, geekUsers []db.User
+		for _, user := range allUsers {
+			if user.HabrMailout {
+				habrUsers = append(habrUsers, user)
+			}
+			if user.GeekMailout {
+				geekUsers = append(geekUsers, user)
+			}
+		}
+
+		// Рассылка статей с Habrahabr
 		logging.LogEvent("Рассылка статей с Habrahabr")
-		err = habrMailout(bot, &lastTime)
+		startTime := time.Now()
+		err = habrMailout(bot, habrUsers, &lastTime)
 		if err != nil {
 			logging.LogMinorError("habrMailout", "вызов habrMailout", err)
 		}
-		logging.LogEvent("Завершена")
+		logging.LogEvent("Завершена. Время выполнения: " + time.Since(startTime).String())
 
+		time.Sleep(time.Second * 1)
+
+		// Рассылка статей с Geektimes
 		logging.LogEvent("Рассылка статей с Geektimes")
-		err = geekMailout(bot, &lastTime)
+		startTime = time.Now()
+		err = geekMailout(bot, geekUsers, &lastTime)
 		if err != nil {
 			logging.LogMinorError("geekMailout", "вызов geekMailout", err)
 		}
-		logging.LogEvent("Завершена")
+		logging.LogEvent("Завершена. Время выполнения: " + time.Since(startTime).String())
 
 		// Перезапись времени
 		raw, _ = json.Marshal(lastTime)
-		err = ioutil.WriteFile("./data/lastArticleTime.json", raw, 0644)
+		err = ioutil.WriteFile(config.Data.PathToTimeFile, raw, 0644)
 		if err != nil {
 			logging.LogFatalError("Mailout", "попытка записать файл lastArticleTime.json", err)
 		}
@@ -891,9 +739,9 @@ func (bot *Bot) mailout() {
 	}
 }
 
-
+ 
 // habrMailout отвечает за рассылку статей с сайта Habrahabr.ru
-func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
+func habrMailout(bot *Bot, allUsers []db.User, lastTime *LastArticlesTime) error {
 	// Parser
 	parser := gofeed.NewParser()
 
@@ -939,42 +787,41 @@ func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
 	}
 
 	// Отправка статей
-	// Получение списка пользователей, которым можно отправлять статьи
-	users, err := bot.db.Query(`SELECT id, habr_tags FROM users WHERE habr_is_stop=0`)
-	if err != nil {
-		return err
-	}
 	// Проход по всем пользователям
-	for users.Next() {
-		var id int64
-		var sTags string
-		users.Scan(&id, &sTags)
-		var userTags []string
-		if sTags != "" {
-			userTags = strings.Split(sTags, " ")
-		}
-
+	articlesCounter := 0
+	for _, user := range allUsers {
 		// Проход по всем статьям в обратном порядке
 		for i := len(newArticles) - 1; i >= 0; i-- {
 			shouldSend := false
-			if len(userTags) == 0 {
+			if len(user.HabrTags) == 0 {
 				shouldSend = true
 			} else {
 				// Проверка, есть ли теги пользователя в статье
 				for _, tag := range newArticles[i].tags {
-					for _, userTag := range userTags {
+					for _, userTag := range user.HabrTags {
 						if tag == userTag {
 							shouldSend = true
+							goto send
 						}
 					}
 				}
 			}
+			send:
 
 			// Отправка пользователю
 			if shouldSend {
-				message := tgbotapi.NewMessage(id, newArticles[i].message)
+				articlesCounter++
+				message := tgbotapi.NewMessage(user.ID, newArticles[i].message)
 				message.ParseMode = "HTML"
+
+				t := time.Now()
+				
 				bot.send(message)
+
+				since := time.Since(t)
+				if since >= time.Second * 1 {
+					logging.LogMinorError("geekMailout", "Отправка статьи заняла " + since.String(), errors.New(""))
+				}
 			}
 		}
 	}
@@ -991,7 +838,7 @@ func habrMailout(bot *Bot, lastTime *LastArticlesTime) error {
 
 
 // geekMailout отвечает за рассылку статей с сайта Geektimes.ru
-func geekMailout(bot *Bot, lastTime *LastArticlesTime) error {
+func geekMailout(bot *Bot, allUsers []db.User, lastTime *LastArticlesTime) error {
 	// Parser
 	parser := gofeed.NewParser()
 
@@ -1037,42 +884,40 @@ func geekMailout(bot *Bot, lastTime *LastArticlesTime) error {
 	}
 
 	// Отправка статей
-	// Получение списка пользователей, которым можно отправлять статьи
-	users, err := bot.db.Query(`SELECT id, geek_tags FROM users WHERE geek_is_stop=0`)
-	if err != nil {
-		return err
-	}
 	// Проход по всем пользователям
-	for users.Next() {
-		var id int64
-		var sTags string
-		users.Scan(&id, &sTags)
-		var userTags []string
-		if sTags != "" {
-			userTags = strings.Split(sTags, " ")
-		}
-
+	for _, user := range allUsers {
 		// Проход по всем статьям в обратном порядке
 		for i := len(newArticles) - 1; i >= 0; i-- {
+			
 			shouldSend := false
-			if len(userTags) == 0 {
+			if len(user.GeekTags) == 0 {
 				shouldSend = true
 			} else {
 				// Проверка, есть ли теги пользователя в статье
 				for _, tag := range newArticles[i].tags {
-					for _, userTag := range userTags {
+					for _, userTag := range user.GeekTags {
 						if tag == userTag {
 							shouldSend = true
+							goto send
 						}
 					}
 				}
 			}
+			send:
 
 			// Отправка пользователю
 			if shouldSend {
-				message := tgbotapi.NewMessage(id, newArticles[i].message)
+				message := tgbotapi.NewMessage(user.ID, newArticles[i].message)
 				message.ParseMode = "HTML"
+
+				t := time.Now()
+				
 				bot.send(message)
+
+				since := time.Since(t)
+				if since >= time.Second * 1 {
+					logging.LogMinorError("geekMailout", "Отправка статьи заняла " + since.String(), errors.New(""))
+				}
 			}
 		}
 	}

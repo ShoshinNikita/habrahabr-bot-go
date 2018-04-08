@@ -2,59 +2,43 @@ package main
 
 import (
 	"log"
-	"os"
-	"fmt"
 
 	"bot"
+	"config"
+	"db"
 	"logging"
 	"website"
-	"config"
 )
 
 
 func main() {
-	// Чтение config.json (В первую очередь!)
-	err := config.ReadConfig()
+	// Получение конфигурационной информации
+	err := config.GetConfigInfo()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Инициализация advanced-log
-	err = logging.Initialize()
+	err = logging.Initialize(config.Data.Debug)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	logging.LogEvent("Старт программы")
-	
+
+	// Инициализация базы данных
+	db.Open(config.Data.PathToDataBase)
 
 	// Инициализация бота
 	logging.LogEvent("Инициализация бота")
 	habrBot := bot.NewBot()
-	
-	args := os.Args[1:]
-	if len(args) == 0 {
 
-		logging.LogEvent("Запуск бота")
-		go habrBot.StartPooling()
+	// Запуск бота
+	logging.LogEvent("Запуск бота")
+	go habrBot.StartPooling()
 
-		logging.LogEvent("Запуск сайта")
-		go website.RunSite(habrBot)
-
-	} else if args[0] == "-bot" {
-
-		logging.LogEvent("Запуск бота")
-		go habrBot.StartPooling()
-
-	} else if args[0] == "-web" {
-
-		logging.LogEvent("Запуск сайта")
-		go website.RunSite(habrBot)
-
-	} else {
-		fmt.Println("Неверные аргументы")
-		logging.FatalErrorChan <- true
-	}
+	// Запуск сайта
+	logging.LogEvent("Запуск сайта")
+	go website.RunSite(habrBot)
 
 	// Поток блокируется до появления фатальной ошибки
 	// (при появлении фатальной ошибки программа завершится с кодом 1)

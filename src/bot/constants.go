@@ -1,7 +1,7 @@
 package bot
 
-const habrArticleRegexPattern = `(https://)?habrahabr\.ru/(post|company/\w+/blog)?/\d{1,6}/?`
-const geekArticleRegexPattern = `(https://)?geektimes\.ru/(post|company/\w+/blog)?/\d{1,6}/?`
+const habrArticleRegexPattern = `(https://)?habrahabr\.ru/(post|company/[a-zA-Z-_ ]+/blog)?/\d{1,6}/?`
+const geekArticleRegexPattern = `(https://)?geektimes\.ru/(post|company/[a-zA-Z-_ ]+/blog)?/\d{1,6}/?`
 
 const habrUserRegexPattern = `^https://habrahabr\.ru/users/[\w\s]+/$`
 const geekUserRegexPattern = `^https://geektimes\.ru/users/[\w\s]+/$`

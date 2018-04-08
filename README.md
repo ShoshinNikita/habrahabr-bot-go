@@ -7,7 +7,6 @@
 * Язык - go1.10
 * Сторонние библиотеки:
 	* Telegram Bot API – [telegram-bot-api.v4](http://gopkg.in/telegram-bot-api.v4)
-	* SQLite3 driver – [go-sqlite3](https://github.com/mattn/go-sqlite3)
 	* RSS парсер – [gofeed](https://github.com/mmcdole/gofeed)
 	* Web scraper – [soup](https://github.com/anaskhan96/soup)
 	* Парсер дат и времени – [jodaTime](https://github.com/vjeantet/jodaTime)
@@ -29,6 +28,9 @@
 		* constants.go - константы
 	* config
 		* config.go – хранит конфигурационную информацию
+	* db
+		* db.go – отвечает за взаимодействие с базой данных
+		* functions.go
 	* logging
 		* logging.go – отвечает за логгирование всего, что происходит в программе
 	* main
@@ -36,39 +38,46 @@
 	* website
 		* website.go – модуль, отвечающая за сайт
 * data
-	* config.json
 	* database.db
 	* lastArticleTime.json
 * templates
 	* index.html - страница отправки сообщений
 * stuff – содержит разные материалы
 
+### Конфигурационная информация ###
+
+Конфигурационная информация передаётся при запуске программы с помощью аргументов
+
+```
+  -aToken string
+    	token of an app
+  -bToken string
+    	token of a bot
+  -dbPath string
+    	path to the database
+  -debug
+    	debug mode (default – false)
+  -delay int
+    	delay of getting articles (default 600000000000)
+  -logUrl string
+    	url of advanced-log
+  -pass string
+    	password for the site
+  -timePath string
+    	path to the file 'lastArticleTime.json'
+```
+
 ### Содержание файлов ###
 
-* Файл config.json содержит конфигурационную информацию:
+* Файл database.db – boltDB база данных.
+	Структура:
 
-```json
-{
-	"botToken": "***BOT TOKEN***",
-	"appToken": "***APP TOKEN IN ADVANCED LOG***",
-	"delay": "***TIME IN NANOSECONDS***",
-	"password": "***PASSWORD FOR WEBSITE***",
-	"advancedLogUrl": "***URL TO ADVANCED LOG***"
-}
-```
-
-* Файл database.db – SQLite база данных.
-
-```sql
-CREATE TABLE "users" (
-	`id` INTEGER,
-	`habr_tags` TEXT DEFAULT "",
-	`habr_is_stop` INTEGER DEFAULT 0,
-	`geek_tags` INTEGER DEFAULT "",
-	`geek_is_stop` INTEGER DEFAULT 0,
-	PRIMARY KEY(`id`)
-)
-```
+	* users
+		* id
+			* HabrTags
+			* HabrMailout
+			* GeekTags
+			* GeekMailout
 
 * Файл lastArticleTime.json хранит время последних отправленных статей в UNIX формате
 

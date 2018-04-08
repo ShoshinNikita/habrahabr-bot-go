@@ -34,11 +34,11 @@ var FatalErrorChan chan bool
 
 
 // Initialize инициализирует remoteLog
-func Initialize() error {
+func Initialize(debug bool) error {
 	var err error
 
 	FatalErrorChan = make(chan bool, 1)
-	remoteLog, err = advancedlog.NewLog(config.Data.AppToken, config.Data.AdvancedLogURL)
+	remoteLog, err = advancedlog.NewLog(config.Data.AppToken, config.Data.AdvancedLogURL, debug)
 	return err
 }
 
@@ -94,7 +94,7 @@ func LogMinorError(funcName, message string, err error) {
 // LogFatalError логгирует фатальную ошибку, после чего завершает программу с кодом 1
 func LogFatalError(funcName, message string, err error) {
 	// На всякий случай
-	log.Panicln(funcName, err.Error())
+	log.Println(funcName, message, err.Error())
 
 	text := "!!! FATAL !!! Function: " + funcName + " Message: " + message + " Error: " + err.Error()
 	err = remoteLog.Log("error", "", text, time.Now().Unix())
