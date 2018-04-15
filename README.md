@@ -53,8 +53,6 @@
     	token of an app
   -bToken string
     	token of a bot
-  -dbPath string
-    	path to the database
   -debug
     	debug mode (default – false)
   -delay int
@@ -63,8 +61,8 @@
     	url of advanced-log
   -pass string
     	password for the site
-  -timePath string
-    	path to the file 'lastArticleTime.json'
+  -prefix string
+    	prefix for paths to files (db, *.json)
 ```
 
 ### Содержание файлов ###

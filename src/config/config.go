@@ -13,8 +13,7 @@ type ConfigurationData struct {
 	Delay			int64		// в наносекундах
 	SitePassword 	string		// пароль от сайта
 	AdvancedLogURL	string		// url of instant of advanced-log
-	PathToDataBase	string		// путь до базы данных
-	PathToTimeFile	string		// путь до файла, в котором хранится время последних статей
+	Prefix			string		// префикс для всех файлов
 	Debug			bool
 }
 
@@ -29,14 +28,12 @@ func GetConfigInfo() error {
 	flag.Int64Var(&Data.Delay, "delay", 600000000000, "delay of getting articles")
 	flag.StringVar(&Data.SitePassword, "pass", "", "password for the site")
 	flag.StringVar(&Data.AdvancedLogURL, "logUrl", "", "url of advanced-log")
-	flag.StringVar(&Data.PathToDataBase, "dbPath", "", "path to the database")
-	flag.StringVar(&Data.PathToTimeFile, "timePath", "", "path to the file 'lastArticleTime.json'")
+	flag.StringVar(&Data.Prefix, "prefix", "", "prefix for paths to files (db, *.json)")
 	flag.BoolVar(&Data.Debug, "debug", false, "debug mode (default – false)")
 	
 	flag.Parse()
 
-	if Data.BotToken == "" || Data.AppToken == "" || Data.AdvancedLogURL == "" || 
-	Data.PathToDataBase == "" || Data.PathToTimeFile == "" {
+	if Data.BotToken == "" || Data.AppToken == "" || Data.AdvancedLogURL == "" {
 		return errors.New("Miss the flag")
 	}
 

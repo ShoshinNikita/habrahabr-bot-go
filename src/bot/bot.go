@@ -112,7 +112,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 
 	command := message.Command()
 	if command == "" {
-		logging.LogRequest(logging.RequestData{Command: "InstantView", Username: message.Chat.UserName})
+		logging.LogRequest(logging.RequestData{Command: "InstantView", Username: message.Chat.UserName, ID: message.Chat.ID})
 	
 		if res, _ := regexp.MatchString(habrArticleRegexPattern, message.Text); res {
 			bot.sendIVChan <- userCommand{message, habr}
@@ -123,7 +123,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 		}
 	} else {
 		// Логгирование запроса
-		logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName})
+		logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName, ID: message.Chat.ID})
 
 		// Рассматривается отдельно, т.к. команды используется без префиксов
 		if command == "help" {
@@ -681,7 +681,7 @@ func (bot *Bot) mailout() {
 	var lastTime LastArticlesTime
 
 	// Чтение LastTime
-	raw, err := ioutil.ReadFile(config.Data.PathToTimeFile)
+	raw, err := ioutil.ReadFile(config.Data.Prefix + "data/lastArticleTime.json")
 	if err != nil {
 		logging.LogFatalError("Mailout", "попытка прочесть lastArticleTime.json", err)
 	}
@@ -731,7 +731,7 @@ func (bot *Bot) mailout() {
 
 		// Перезапись времени
 		raw, _ = json.Marshal(lastTime)
-		err = ioutil.WriteFile(config.Data.PathToTimeFile, raw, 0644)
+		err = ioutil.WriteFile(config.Data.Prefix + "data/lastArticleTime.json", raw, 0644)
 		if err != nil {
 			logging.LogFatalError("Mailout", "попытка записать файл lastArticleTime.json", err)
 		}
@@ -820,7 +820,7 @@ func habrMailout(bot *Bot, allUsers []db.User, lastTime *LastArticlesTime) error
 
 				since := time.Since(t)
 				if since >= time.Second * 1 {
-					logging.LogMinorError("geekMailout", "Отправка статьи заняла " + since.String(), errors.New(""))
+					logging.LogMinorError("habrMailout", "Отправка статьи заняла " + since.String(), errors.New(""))
 				}
 			}
 		}

@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"strconv"
 	"log"
 	"time"
 	"os"
@@ -25,6 +26,7 @@ type ErrorData struct {
 // RequestData содержит информацию о запросе
 type RequestData struct {
 	Username 	string
+	ID			int64
 	Command 	string
 }
 
@@ -54,7 +56,7 @@ func LogEvent(event string) {
 
 // LogRequest логгирует запрос от пользователя
 func LogRequest(data RequestData) {
-	text := "User: " + data.Username
+	text := "User: " + data.Username + " ID: " + strconv.FormatInt(data.ID, 10)
 	err := remoteLog.Log("request", data.Command, text, time.Now().Unix())
 	if err != nil {
 		log.Println(err)

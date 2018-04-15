@@ -26,7 +26,7 @@ func main() {
 	logging.LogEvent("Старт программы")
 
 	// Инициализация базы данных
-	db.Open(config.Data.PathToDataBase)
+	db.Open(config.Data.Prefix + "data/database.db")
 
 	// Инициализация бота
 	logging.LogEvent("Инициализация бота")

@@ -23,11 +23,11 @@ const geek = "geektimes"
 
 // User содержит в себе информацию о пользователе
 type User struct {
-	ID			int64
-	HabrTags	[]string // Если тегов нет, то slice содержит 1 элемент == ""
-	HabrMailout bool
-	GeekTags	[]string // Если тегов нет, то slice содержит 1 элемент == ""
-	GeekMailout bool
+	ID			int64		`json:"id"`
+	HabrTags	[]string	`json:"habrTags"`
+	HabrMailout bool		`json:"habrMailout"`
+	GeekTags	[]string 	`json:"geekTags"`
+	GeekMailout bool		`json:"geekMailout"`
 }
 
 var dbAdapter *bolt.DB
@@ -174,6 +174,21 @@ func GetAllUsers() ([]User, error) {
 	}
 
 	return users, nil
+}
+
+// GetUsersNumber возвращает количество пользователей
+func GetUsersNumber() (int64) {
+	var counter int64
+	dbAdapter.View(func(tx *bolt.Tx) error {
+		usersBucket := tx.Bucket([]byte("users"))
+		c := usersBucket.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			counter++
+		}
+		return nil
+	})
+
+	return counter
 }
 
 /* TAGS */
