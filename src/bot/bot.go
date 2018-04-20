@@ -35,7 +35,7 @@ type Bot struct {
 	copyTagsChan	   chan userCommand
 	sendIVChan		   chan userCommand
 	getBestChan		   chan userCommand
-	keyboardChan       chan userCommand
+	keyboardChan       chan *tgbotapi.Message
 }
 
 
@@ -64,7 +64,7 @@ func NewBot() *Bot {
 	bot.copyTagsChan = 		make(chan userCommand, 50)
 	bot.sendIVChan = 		make(chan userCommand, 50)
 	bot.getBestChan = 		make(chan userCommand, 50)
-	bot.keyboardChan =      make(chan userCommand, 50)
+	bot.keyboardChan =      make(chan *tgbotapi.Message, 50)
 
 	return &bot
 }
@@ -135,6 +135,9 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 		} else if command == "start" {
 			bot.startChan <- message
 			return true
+		} else if command == "keyboard" {
+			bot.keyboardChan <- message
+			return true
 		}
 
 		// Длина всегда > 5
@@ -184,12 +187,7 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 				bot.copyTagsChan <- userCommand{message, site}
 				isRightCommand = true
 			}
-			case "keyboard" : {
-				bot.keyboardChan <- userCommand{message, site}
-				isRightCommand = true
-			}
 		}
-		
 	}
 
 	return isRightCommand
@@ -210,7 +208,6 @@ func (bot *Bot) Notify(sMessage string) {
 		bot.send(message)
 	}
 }
-
 
 
 // send отправляет сообщение
@@ -236,7 +233,7 @@ func (bot *Bot) start(data chan *tgbotapi.Message) {
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Привет, " + msg.Chat.UserName + "! Введи /help для справки")
-		message.ReplyMarkup = habrKeyboard()
+		message.ReplyMarkup = createKeyboard()
 		bot.send(message)
 	}
 }
@@ -942,25 +939,11 @@ func geekMailout(bot *Bot, allUsers []db.User, lastTime *LastArticlesTime) error
 }
 
 
-//handleKeyboard отвечает за оброботку уникальных для клавы команд.
-func (bot *Bot) handleKeyboard(data chan userCommand) {
-
-	for command := range data {
-		text := command.message.Text
-
-		if strings.Contains(text, "keyboard") {
-			var message tgbotapi.MessageConfig
-
-			if command.site == habr {
-				message = tgbotapi.NewMessage(command.message.Chat.ID, "Клавиатура изменена на " + habr)
-				message.ReplyMarkup = habrKeyboard()
-			} else if command.site == geek {
-				message = tgbotapi.NewMessage(command.message.Chat.ID, "Клавиатура изменена на " + geek)
-				message.ReplyMarkup = geekKeyboard()
-			}
-
-			bot.send(message)
-		}
+// handleKeyboard включает клавиатуру
+func (bot *Bot) handleKeyboard(data chan *tgbotapi.Message) {
+	for msg := range data {
+		message := tgbotapi.NewMessage(msg.Chat.ID, "Клавиатура включена")
+		message.ReplyMarkup = createKeyboard()
+		bot.send(message)
 	}
-
 }
