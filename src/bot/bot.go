@@ -77,7 +77,7 @@ func (bot *Bot) StartPooling() {
 	go bot.startMailout(bot.startMailoutChan)
 	go bot.help(bot.helpChan)
 	go bot.stopMailoutForUser(bot.stopMailoutChan)
-	//go bot.mailout()
+	go bot.mailout()
 	go bot.getStatus(bot.getStatusChan)
 	go bot.addTags(bot.addTagsChan)
 	go bot.delTags(bot.delTagsChan)
