@@ -24,17 +24,18 @@ type Bot struct {
 	botAPI 	*tgbotapi.BotAPI
 
 	// Каналы
-	startChan	 		chan *tgbotapi.Message
-	startMailoutChan	chan userCommand
-	helpChan			chan *tgbotapi.Message
-	stopMailoutChan 	chan userCommand
-	getStatusChan		chan userCommand
-	addTagsChan			chan userCommand
-	delTagsChan			chan userCommand
-	delAllTagsChan		chan userCommand
-	copyTagsChan		chan userCommand
-	sendIVChan			chan userCommand
-	getBestChan			chan userCommand
+	startChan	 	   chan *tgbotapi.Message
+	startMailoutChan   chan userCommand
+	helpChan		   chan *tgbotapi.Message
+	stopMailoutChan    chan userCommand
+	getStatusChan	   chan userCommand
+	addTagsChan		   chan userCommand
+	delTagsChan		   chan userCommand
+	delAllTagsChan	   chan userCommand
+	copyTagsChan	   chan userCommand
+	sendIVChan		   chan userCommand
+	getBestChan		   chan userCommand
+	keyboardChan       chan userCommand
 }
 
 
@@ -44,7 +45,7 @@ func NewBot() *Bot {
 
 	// Инициализация бота
 	var bot Bot
-	bot.botAPI, err = tgbotapi.NewBotAPI(config.Data.BotToken)
+	bot.botAPI, err = tgbotapi.NewBotAPI("522818795:AAFQnTgc-nfziv3zXjb7MNF1PzoSSIjanHI")
 	if err != nil {
 		logging.LogFatalError("NewBot", "вызов NewBotAPI()", err)
 	}
@@ -63,6 +64,7 @@ func NewBot() *Bot {
 	bot.copyTagsChan = 		make(chan userCommand, 50)
 	bot.sendIVChan = 		make(chan userCommand, 50)
 	bot.getBestChan = 		make(chan userCommand, 50)
+	bot.keyboardChan =      make(chan userCommand, 50)
 
 	return &bot
 }
@@ -75,7 +77,7 @@ func (bot *Bot) StartPooling() {
 	go bot.startMailout(bot.startMailoutChan)
 	go bot.help(bot.helpChan)
 	go bot.stopMailoutForUser(bot.stopMailoutChan)
-	go bot.mailout()
+	//go bot.mailout()
 	go bot.getStatus(bot.getStatusChan)
 	go bot.addTags(bot.addTagsChan)
 	go bot.delTags(bot.delTagsChan)
@@ -83,6 +85,7 @@ func (bot *Bot) StartPooling() {
 	go bot.getBest(bot.getBestChan)
 	go bot.copyTags(bot.copyTagsChan)
 	go bot.sendIV(bot.sendIVChan)
+	go bot.handleKeyboard(bot.keyboardChan)
 
 	// Главный цикл
 	updateConfig := tgbotapi.NewUpdate(0)
@@ -181,6 +184,10 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 				bot.copyTagsChan <- userCommand{message, site}
 				isRightCommand = true
 			}
+			case "keyboard" : {
+				bot.keyboardChan <- userCommand{message, site}
+				isRightCommand = true
+			}
 		}
 		
 	}
@@ -203,6 +210,7 @@ func (bot *Bot) Notify(sMessage string) {
 		bot.send(message)
 	}
 }
+
 
 
 // send отправляет сообщение
@@ -228,6 +236,7 @@ func (bot *Bot) start(data chan *tgbotapi.Message) {
 		}
 
 		message := tgbotapi.NewMessage(msg.Chat.ID, "Привет, " + msg.Chat.UserName + "! Введи /help для справки")
+		message.ReplyMarkup = habrKeyboard()
 		bot.send(message)
 	}
 }
@@ -930,4 +939,28 @@ func geekMailout(bot *Bot, allUsers []db.User, lastTime *LastArticlesTime) error
 	lastTime.Geek = tempTime.Unix()
 
 	return nil
+}
+
+
+//handleKeyboard отвечает за оброботку уникальных для клавы команд.
+func (bot *Bot) handleKeyboard(data chan userCommand) {
+
+	for command := range data {
+		text := command.message.Text
+
+		if strings.Contains(text, "keyboard") {
+			var message tgbotapi.MessageConfig
+
+			if command.site == habr {
+				message = tgbotapi.NewMessage(command.message.Chat.ID, "Клавиатура изменена на " + habr)
+				message.ReplyMarkup = habrKeyboard()
+			} else if command.site == geek {
+				message = tgbotapi.NewMessage(command.message.Chat.ID, "Клавиатура изменена на " + geek)
+				message.ReplyMarkup = geekKeyboard()
+			}
+
+			bot.send(message)
+		}
+	}
+
 }
