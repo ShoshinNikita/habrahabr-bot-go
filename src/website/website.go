@@ -95,10 +95,16 @@ func send(w http.ResponseWriter, r *http.Request) {
 	
 	if password := r.Form.Get("password"); password == config.Data.SitePassword {
 		message := r.Form.Get("message")
-		bot.Notify(message)
-		w.WriteHeader(http.StatusOK)
+		err := bot.Notify(message)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Ошибка: %s", err.Error())
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "Неверный пароль")
 	}
 }
 

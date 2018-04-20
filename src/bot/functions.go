@@ -25,8 +25,8 @@ func createKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	keyboard = append(keyboard, []tgbotapi.KeyboardButton{{Text: "/geek_best"}, {Text: "/geek_tags"}})
 
 	return tgbotapi.ReplyKeyboardMarkup{
+		Keyboard        : keyboard,
 		ResizeKeyboard  : true,
 		OneTimeKeyboard : false,
-		Keyboard        : keyboard,
 	}
 }

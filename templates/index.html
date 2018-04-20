@@ -98,8 +98,12 @@
 		var posting = $.post(url, { message: msg, password: pass });
 		
 		posting.fail(function(data) {
-			alert("Неверный пароль");
-			$form.find("input[name='password']").val("");
+			if (data.status == 500) {
+				alert(data.responseText)
+			} else if (data.status == 400) {
+				alert(data.responseText);
+				$form.find("input[name='password']").val("");
+			}
 		});
 		posting.done(function(data) {
 			alert("Отправлено")
