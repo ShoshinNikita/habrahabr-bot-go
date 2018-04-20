@@ -45,7 +45,7 @@ func NewBot() *Bot {
 
 	// Инициализация бота
 	var bot Bot
-	bot.botAPI, err = tgbotapi.NewBotAPI("522818795:AAFQnTgc-nfziv3zXjb7MNF1PzoSSIjanHI")
+	bot.botAPI, err = tgbotapi.NewBotAPI(config.Data.BotToken)
 	if err != nil {
 		logging.LogFatalError("NewBot", "вызов NewBotAPI()", err)
 	}
