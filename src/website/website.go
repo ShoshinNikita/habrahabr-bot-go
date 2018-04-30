@@ -9,9 +9,10 @@ import (
 	
 	"github.com/gorilla/mux"
 
+	artdb "articlesdb"
 	botPackage "bot"
 	"config"
-	"db"
+	"userdb"
 )
 
 var bot *botPackage.Bot
@@ -30,9 +31,11 @@ func index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := make(map[string]interface{})
-	data["usersNumber"] = db.GetUsersNumber()
+	data["usersNumber"] = userdb.GetUsersNumber()
+	data["articlesNumber"] = artdb.CountArticles()
 	t.Execute(w, data)
 }
+
 
 // auth обрабатывает запросы на '/auth'
 func auth(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +62,7 @@ func returnUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.URL.Query().Get("id")
-	user, err := db.GetUser(id)
+	user, err := userdb.GetUser(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -120,5 +123,5 @@ func RunSite(mainBot *botPackage.Bot) {
 	router.Methods("POST").Path("/auth").HandlerFunc(checkPass)
 	router.Methods("POST").Path("/send").HandlerFunc(send)
 
-	http.ListenAndServe(":8080", router)
+	http.ListenAndServe(":" + config.Data.Port, router)
 }

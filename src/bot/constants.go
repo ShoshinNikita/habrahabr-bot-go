@@ -1,29 +1,34 @@
 package bot
 
-const habrArticleRegexPattern = `(https://)?habrahabr\.ru/(post|company/[a-zA-Z-_ ]+/blog)?/\d{1,6}/?`
-const geekArticleRegexPattern = `(https://)?geektimes\.ru/(post|company/[a-zA-Z-_ ]+/blog)?/\d{1,6}/?`
-
-const habrUserRegexPattern = `^https://habrahabr\.ru/users/[\w\s]+/$`
-const geekUserRegexPattern = `^https://geektimes\.ru/users/[\w\s]+/$`
-
-const messageText = "[{source}] {title} <a href='{IV}'>(IV)</a>\n\n<a href='{link}'>Перейти к статье</a>\n\n<a href='{link}#comments'>Перейти к комментариям</a>"
-
-// ссылка на InstantView с {url} вместо ссылки на статью
-const habrInstantViewURL = "https://t.me/iv?url={url}&rhash=2cb77307aed3b2"
-const geekInstantViewURL = "https://t.me/iv?url={url}&rhash=267de544beb71f"
-
-const allHabrArticlesURL = "https://habrahabr.ru/rss/all/?with_hubs=true:?with_tags=true:"
-const bestHabrArticlesURL = "https://habrahabr.ru/rss/best/?with_hubs=true:?with_tags=true:"
-
-const allGeekArticlesURL = "https://geektimes.ru/rss/all/?with_hubs=true:?with_tags=true:"
-const bestGeekArticlesURL = "https://geektimes.ru/rss/best/?with_hubs=true:?with_tags=true:"
-
 // Константы для определения сайта
 const geek = "geektimes"
 const habr = "habrahabr"
 
-const helpText = `
-📝 <b>КОМАНДЫ</b>:
+const habrArticleRegexPattern = `(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/(post|company/[\w-_ ]+/blog)/\d{1,7}/?`
+const geekArticleRegexPattern = `(https://)?geektimes\.(ru|com)/(post|company/[\w-_ ]+/blog)/\d{1,7}/?`
+
+const habrUserRegexPattern = `^https://habrahabr\.ru/users/[\w\s]+/$`
+const geekUserRegexPattern = `^https://geektimes\.ru/users/[\w\s]+/$`
+
+// Текст для статьи. Нужно отформатировать функцией formatString(...)
+const messageText = `#{source}
+{title} <a href='{IV}'>(IV)</a>
+
+<a href='{link}'>Перейти к статье</a>
+
+<a href='{link}#comments'>Перейти к комментариям</a>`
+
+// ссылка на InstantView с {url} вместо ссылки на статью
+const habrInstantViewURL = "https://t.me/iv?url={url}&rhash=640326b822845b"
+const geekInstantViewURL = "https://t.me/iv?url={url}&rhash=39bf05816e1769"
+
+const allHabrArticlesURL = "https://habr.com/rss/all/?with_hubs=true:?with_tags=true:"
+const bestHabrArticlesURL = "https://habr.com/rss/best/?with_hubs=true:?with_tags=true:"
+
+const allGeekArticlesURL = "https://geektimes.com/rss/all/?with_hubs=true:?with_tags=true:"
+const bestGeekArticlesURL = "https://geektimes.com/rss/best/?with_hubs=true:?with_tags=true:"
+
+const helpText = `📝 <b>КОМАНДЫ</b>:
 * /help – показать помощь
 * /show_keyboard – включает клавиатуру (/hide_keyboard – выключает)
 * /habr_tags (/geek_tags) – показать 📃 список тегов, на которые пользователь подписан
@@ -34,10 +39,11 @@ const helpText = `
 * /habr_best (/geek_best) – получить лучшие статьи за день (по-умолчанию присылается 5, но можно через пробел указать другое количество)
 * /habr_stop (/geek_stop) – 🔕 приостановить рассылку (для продолжения рассылки - /start)
 
-<a href= 'http://telegra.ph/Kak-polzovatsya-unofficial-habr-bot-03-09'>Дополнительная информация</a>
-`
+<a href= 'http://telegra.ph/Kak-polzovatsya-unofficial-habr-bot-03-09'>Дополнительная информация</a>`
 
-const botFatherCommands = `
+/*
+Команды для BotFather:
+
 help - показать помощь
 show_keyboard - включает клавиатуру
 hide_keyboard - выключает клавиатуру
@@ -55,4 +61,4 @@ geek_del_all_tags - удалить ВСЕ теги
 geek_copy_tags - скопировать теги из профиля на geektimes'e
 geek_stop - приостановить рассылку
 geek_best - получить лучшие статьи за день
-`
+*/

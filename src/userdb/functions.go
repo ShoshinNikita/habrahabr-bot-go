@@ -1,4 +1,4 @@
-package db
+package userdb
 
 import (
 	"strconv"

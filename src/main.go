@@ -2,10 +2,15 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"	
 
+	"articlesdb"
 	"bot"
 	"config"
-	"db"
+	"userdb"
 	"logging"
 	"website"
 )
@@ -25,22 +30,49 @@ func main() {
 	}
 	logging.LogEvent("Старт программы")
 
-	// Инициализация базы данных
-	db.Open(config.Data.Prefix + "data/database.db")
+	// Инициализация базы данных c пользователями
+	err = userdb.Open(config.Data.Prefix + "data/users.db")
+	if err != nil {
+		logging.LogFatalError("main", "попытка открыть базу данных с пользователями", err)
+	}
+
+	// Инициализация базы данных cо статьями
+	err = articlesdb.Open(config.Data.Prefix + "data/articles.db")
+	if err != nil {
+		logging.LogFatalError("main", "попытка открыть базу данных со статьями", err)
+	}
 
 	// Инициализация бота
 	logging.LogEvent("Инициализация бота")
-	habrBot := bot.NewBot()
+	habrBot, err := bot.NewBot()
+	if err != nil {
+		logging.LogFatalError("main", "попытка залогиниться в бота", err)
+	}
 
 	// Запуск бота
 	logging.LogEvent("Запуск бота")
-	go habrBot.StartPooling()
+	stopChan := make(chan struct{})
+	go habrBot.StartPooling(stopChan)
 
 	// Запуск сайта
 	logging.LogEvent("Запуск сайта")
 	go website.RunSite(habrBot)
 
-	// Поток блокируется до появления фатальной ошибки
-	// (при появлении фатальной ошибки программа завершится с кодом 1)
-	<- logging.FatalErrorChan
+
+	// Перехватываем сигналы
+	sigChan := make(chan os.Signal, 1)
+	// SIGTERM для Сервера (htop kill 15), SIGINT для Windows (Ctrl+C)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	// Ждём сигнала
+	<- sigChan
+	// Останавливаем бота
+	close(stopChan)
+	// Ждём пока все функции завершатся.
+	// Из-за того, что бот больше не принимает новые сообщений, функции не будут вызываться
+	time.Sleep(2 * time.Second)
+	// Закрытие баз данных
+	userdb.Close()
+	articlesdb.Close()
+	logging.LogEvent("Остановка работы")
+	time.Sleep(500 * time.Millisecond)
 }

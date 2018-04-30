@@ -31,15 +31,11 @@ type RequestData struct {
 }
 
 var remoteLog *advancedlog.LogAPI
-// FatalErrorChan служит для блокировки основного потока
-var FatalErrorChan chan bool
 
 
 // Initialize инициализирует remoteLog
 func Initialize(debug bool) error {
 	var err error
-
-	FatalErrorChan = make(chan bool, 1)
 	remoteLog, err = advancedlog.NewLog(config.Data.AppToken, config.Data.AdvancedLogURL, debug)
 	return err
 }
@@ -98,7 +94,7 @@ func LogFatalError(funcName, message string, err error) {
 	// На всякий случай
 	log.Println(funcName, message, err.Error())
 
-	text := "!!! FATAL !!! Function: " + funcName + " Message: " + message + " Error: " + err.Error()
+	text := "FATAL ERROR Function: " + funcName + " Message: " + message + " Error: " + err.Error()
 	err = remoteLog.Log("error", "", text, time.Now().Unix())
 	if err != nil {
 		log.Println(err)

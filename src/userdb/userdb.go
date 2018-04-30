@@ -1,4 +1,4 @@
-package db
+package userdb
 
 import (
 	"errors"
@@ -49,6 +49,11 @@ func Open(relativePath string) error {
 	}
 
 	return nil
+}
+
+// Close закрывает базу данных
+func Close() {
+	dbAdapter.Close()
 }
 
 /* USERS */
@@ -214,7 +219,6 @@ func AddUserTags(id, site string, newTags []string) ([]string, error) {
 		if userBucket == nil {
 			return errors.New("User with id '" + id + "' doesn't exist")
 		}
-		oldTags := make([]string, 0)
 
 		// Получение slice из старых тегов
 		oldTags, err := toSlice(userBucket.Get([]byte(destination)))
@@ -286,7 +290,6 @@ func DelUserTags(id, site string, tagsForDel []string) ([]string, error) {
 		if userBucket == nil {
 			return errors.New("User with id '" + id + "' doesn't exist")
 		}
-		oldTags := make([]string, 0)
 
 		// Получение slice из старых тегов
 		oldTags, err := toSlice(userBucket.Get([]byte(destination)))

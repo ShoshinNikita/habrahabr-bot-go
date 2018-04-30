@@ -10,6 +10,7 @@
 	* RSS парсер – [gofeed](https://github.com/mmcdole/gofeed)
 	* Web scraper – [soup](https://github.com/anaskhan96/soup)
 	* Парсер дат и времени – [jodaTime](https://github.com/vjeantet/jodaTime)
+	* Job Scheduling Package – [gocron](https://github.com/jasonlvhit/gocron)
 	* Продвинутое логгирование – [advanced-log](https://github.com/ShoshinNikita/advanced-log) и библиотека для Go – [advanced-log-go](https://github.com/ShoshinNikita/advanced-log-go)
 
 ## Информация о работе ##
@@ -24,13 +25,18 @@
 	* main.go – главный файл
 	* bot
 		* bot.go – модуль, отвечающий за бота
+		* commands.go – функции, которые обрабатывают команды бота
+		* mailout.go – функции, осуществляющие рассылку
 		* functions.go – полезные функции
+		* reminders.go – функции, отвечающие за создание и отправку напоминаний
 		* structures.go – структуры, которые используются в боте
-		* constants.go - константы
+		* constants.go – константы
+	* articlesdb
+		* articlesdb – отвечает за хранение статей
 	* config
 		* config.go – хранит конфигурационную информацию
-	* db
-		* db.go – отвечает за взаимодействие с базой данных
+	* userdb
+		* userdb.go – отвечает за взаимодействие с базой данных
 		* functions.go
 	* logging
 		* logging.go – отвечает за логгирование всего, что происходит в программе
@@ -60,13 +66,15 @@
     	url of advanced-log
   -pass string
     	password for the site
+  -port
+		port for website, without ':'
   -prefix string
     	prefix for paths to files (db, *.json)
 ```
 
 ### Содержание файлов ###
 
-* Файл database.db – boltDB база данных.
+* Файл users.db – boltDB база данных, хранящая данные пользователей
 	Структура:
 
 	* users
@@ -76,6 +84,12 @@
 			* GeekTags
 			* GeekMailout
 
+* Файл articles.db – boltDB база данных, хранящая статьи за последние 7 дней
+	Структура:
+
+	* articles
+		* id – text
+
 * Файл lastArticleTime.json хранит время последних отправленных статей в UNIX формате
 
 ```json
@@ -84,6 +98,8 @@
 	"geek": 0
 }
 ```
+
+* Файл reminders.json используется для хранения напоминаний. Напоминания автоматически загружаются при запуске программы
 
 ## Лицензия ##
 

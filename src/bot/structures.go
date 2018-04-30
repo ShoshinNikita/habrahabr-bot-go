@@ -11,6 +11,7 @@ type article struct {
 	link  string
 	tags  []string
 	message string
+	ID string // ID из базы данных статей
 }
 
 // LastArticlesTime хранит время последних статей на Habrahabr и на Geektimes
@@ -22,4 +23,11 @@ type LastArticlesTime struct {
 type userCommand struct {
 	message *tgbotapi.Message
 	site string 
+}
+
+// Reminder содержит информацию о напоминании
+type Reminder struct {
+	UserID		int64 	`json:"userID"`
+	Text		string 	`json:"text"`
+	Time		int64  	`json:"time"`
 }
