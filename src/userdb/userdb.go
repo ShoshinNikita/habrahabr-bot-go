@@ -44,11 +44,7 @@ func Open(relativePath string) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("users"))
 		return err
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Close закрывает базу данных
@@ -116,11 +112,7 @@ func GetUser(id string) (User, error) {
 			return err
 		}
 		user.GeekMailout, err = toBool(userBucket.Get([]byte("GeekMailout")))
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 	})
 
 	if err != nil {
