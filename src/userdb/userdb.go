@@ -23,11 +23,11 @@ const geek = "geektimes"
 
 // User содержит в себе информацию о пользователе
 type User struct {
-	ID			int64		`json:"id"`
-	HabrTags	[]string	`json:"habrTags"`
-	HabrMailout bool		`json:"habrMailout"`
-	GeekTags	[]string 	`json:"geekTags"`
-	GeekMailout bool		`json:"geekMailout"`
+	ID          int64    `json:"id"`
+	HabrTags    []string `json:"habrTags"`
+	HabrMailout bool     `json:"habrMailout"`
+	GeekTags    []string `json:"geekTags"`
+	GeekMailout bool     `json:"geekMailout"`
 }
 
 var dbAdapter *bolt.DB
@@ -182,7 +182,7 @@ func GetAllUsers() ([]User, error) {
 }
 
 // GetUsersNumber возвращает количество пользователей
-func GetUsersNumber() (int64) {
+func GetUsersNumber() int64 {
 	var counter int64
 	dbAdapter.View(func(tx *bolt.Tx) error {
 		usersBucket := tx.Bucket([]byte("users"))
@@ -241,7 +241,6 @@ func AddUserTags(id, site string, newTags []string) ([]string, error) {
 	return updatedTags, nil
 }
 
-
 // UpdateTags перезаписывает теги
 func UpdateTags(id, site string, tags []string) error {
 	err := dbAdapter.Update(func(tx *bolt.Tx) error {
@@ -267,7 +266,6 @@ func UpdateTags(id, site string, tags []string) error {
 
 	return err
 }
-
 
 // DelUserTags удаляет теги, которые были переданы
 // Возвращает slice, содержащий обновлённые теги
