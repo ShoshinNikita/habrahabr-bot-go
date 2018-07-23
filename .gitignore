@@ -1,8 +1,5 @@
 .vscode
-*.exe
-*.log
+app/habrahabr-bot
+data
 *.bat
-pkg
-*debug
-*debug.test
-production/
+*.py

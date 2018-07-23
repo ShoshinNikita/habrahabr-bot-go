@@ -1,6 +1,6 @@
 # Habrahabr-бот на Go #
 
-Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) и [geektimes.ru](https://geektimes.ru/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habrahabr.ru/post/350858/)
+Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habrahabr.ru/post/350858/)
 
 ## Требования ##
 
@@ -9,13 +9,12 @@
 	* Telegram Bot API – [telegram-bot-api.v4](http://gopkg.in/telegram-bot-api.v4)
 	* RSS парсер – [gofeed](https://github.com/mmcdole/gofeed)
 	* Web scraper – [soup](https://github.com/anaskhan96/soup)
-	* Парсер дат и времени – [jodaTime](https://github.com/vjeantet/jodaTime)
 	* Job Scheduling Package – [gocron](https://github.com/jasonlvhit/gocron)
-	* Продвинутое логгирование – [advanced-log](https://github.com/ShoshinNikita/advanced-log) и библиотека для Go – [advanced-log-go](https://github.com/ShoshinNikita/advanced-log-go)
+	* Логгирование – [advanced-log](https://github.com/ShoshinNikita/advanced-log) и библиотека для Go – [advanced-log-go](https://github.com/ShoshinNikita/advanced-log-go)
 
 ## Информация о работе ##
 
-Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/) ([аналогично](https://geektimes.ru/rss/all/) для Geektimes) для получения списка статей. Данные пользователей (id, теги) хранятся в SQLite базе данных.
+Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/) для получения списка статей. Данные пользователей (id, теги) хранятся в BoltDB.
 
 ## Файлы и их описание ##
 
@@ -55,21 +54,19 @@
 
 ```
   -aToken string
-    	token of an app
+        token of an app
   -bToken string
-    	token of a bot
+        token of a bot
   -debug
-    	debug mode (default – false)
+        debug mode (default – false)
   -delay int
-    	delay of getting articles (default 600000000000)
+        delay of getting articles (default 1200000000000)
   -logUrl string
-    	url of advanced-log
+        url of advanced-log
   -pass string
-    	password for the site
+        password for the site
   -port
-		port for website, without ':'
-  -prefix string
-    	prefix for paths to files (db, *.json)
+        port for website, without ':'
 ```
 
 ### Содержание файлов ###
@@ -79,27 +76,22 @@
 
 	* users
 		* id
-			* HabrTags
-			* HabrMailout
-			* GeekTags
-			* GeekMailout
+			* Tags
+			* Mailout
 
-* Файл articles.db – boltDB база данных, хранящая статьи за последние 7 дней
-	Структура:
-
-	* articles
-		* id – text
-
-* Файл lastArticleTime.json хранит время последних отправленных статей в UNIX формате
+* Файл lastArticles.json хранит ссылки все последние статьи
 
 ```json
 {
-	"habr": 0,
-	"geek": 0
+	"habr": [],
 }
 ```
 
-* Файл reminders.json используется для хранения напоминаний. Напоминания автоматически загружаются при запуске программы
+* Файл ids.json – массив корректных id
+
+```json
+[12, 123, 1234]
+```
 
 ## Лицензия ##
 
