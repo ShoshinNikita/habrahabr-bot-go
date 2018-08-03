@@ -1,6 +1,9 @@
 FROM alpine
+# Change timezone
+RUN apk add --no-cache tzdata
+ENV TZ Europe/Moscow
+# Copy the binary
 RUN mkdir /app
 WORKDIR /app
-COPY . .
-EXPOSE 80
+COPY habrahabr-bot .
 ENTRYPOINT [ "./habrahabr-bot" ]
