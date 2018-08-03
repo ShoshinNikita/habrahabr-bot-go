@@ -122,13 +122,11 @@ func (bot *Bot) distributeUpdate(update tgbotapi.Update) {
 
 	if update.Message != nil {
 		if !isCorrectID(update.Message.Chat.ID) {
-			logging.LogEvent("Wrong ID:")
-			logging.LogRequest(logging.RequestData{
-				Username: update.Message.Chat.UserName,
-				ID:       update.Message.Chat.ID,
-				Command:  update.Message.Text})
+			text := fmt.Sprintf("Wrong ID: %d Username: %s Text: %s", update.Message.Chat.ID,
+				update.Message.Chat.UserName, update.Message.Text)
+			logging.LogEvent(text)
 
-			message := tgbotapi.NewMessage(update.Message.Chat.ID, "Wrong ID")
+			message := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный ID. Для подробностей писать @ShoshinNikita")
 			bot.messages <- message
 			return
 		}
