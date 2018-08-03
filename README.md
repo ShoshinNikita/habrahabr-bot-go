@@ -1,98 +1,45 @@
-# Habrahabr-бот на Go #
+# Habrahabr-бот на Go
 
 Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habrahabr.ru/post/350858/)
 
-## Требования ##
-
-* Язык - go1.10
-* Сторонние библиотеки:
-	* Telegram Bot API – [telegram-bot-api.v4](http://gopkg.in/telegram-bot-api.v4)
-	* RSS парсер – [gofeed](https://github.com/mmcdole/gofeed)
-	* Web scraper – [soup](https://github.com/anaskhan96/soup)
-	* Job Scheduling Package – [gocron](https://github.com/jasonlvhit/gocron)
-	* Логгирование – [advanced-log](https://github.com/ShoshinNikita/advanced-log) и библиотека для Go – [advanced-log-go](https://github.com/ShoshinNikita/advanced-log-go)
-
-## Информация о работе ##
+## Информация о работе
 
 Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/) для получения списка статей. Данные пользователей (id, теги) хранятся в BoltDB.
 
-## Файлы и их описание ##
+## Конфигурационная информация
 
-### Структура папок исходного кода ###
+Конфигурационная информация передаётся при запуске программы с помощью флагов
 
-* src
-	* main.go – главный файл
-	* bot
-		* bot.go – модуль, отвечающий за бота
-		* commands.go – функции, которые обрабатывают команды бота
-		* mailout.go – функции, осуществляющие рассылку
-		* functions.go – полезные функции
-		* reminders.go – функции, отвечающие за создание и отправку напоминаний
-		* structures.go – структуры, которые используются в боте
-		* constants.go – константы
-	* articlesdb
-		* articlesdb – отвечает за хранение статей
-	* config
-		* config.go – хранит конфигурационную информацию
-	* userdb
-		* userdb.go – отвечает за взаимодействие с базой данных
-		* functions.go
-	* logging
-		* logging.go – отвечает за логгирование всего, что происходит в программе
-	* website
-		* website.go – модуль, отвечающая за сайт
-* data
-	* database.db
-	* lastArticleTime.json
-* templates
-	* index.html - страница отправки сообщений
-* stuff – содержит разные материалы
+| Флаг    | Описание                                              | Значение по-умолчанию |
+| ------- | ----------------------------------------------------- | --------------------- |
+| -bToken | токен бота                                            |                       |
+| -delay  | задержка между обновлением статей через RSS feed (нс) | 1200000000000 нс      |
+| -rate   | задержка между отправкой статей (мс)                  | 500 мс                |
 
-### Конфигурационная информация ###
+### Содержание файлов
 
-Конфигурационная информация передаётся при запуске программы с помощью аргументов
+- Файл users.db – boltDB база данных, хранящая данные пользователей
+  Структура:
 
-```
-  -aToken string
-        token of an app
-  -bToken string
-        token of a bot
-  -debug
-        debug mode (default – false)
-  -delay int
-        delay of getting articles (default 1200000000000)
-  -logUrl string
-        url of advanced-log
-  -pass string
-        password for the site
-  -port
-        port for website, without ':'
-```
+      	* users
+      		* id
+      			* Tags
+      			* Mailout
 
-### Содержание файлов ###
-
-* Файл users.db – boltDB база данных, хранящая данные пользователей
-	Структура:
-
-	* users
-		* id
-			* Tags
-			* Mailout
-
-* Файл lastArticles.json хранит ссылки все последние статьи
+- Файл lastArticles.json хранит ссылки все последние статьи
 
 ```json
 {
-	"habr": [],
+  "habr": []
 }
 ```
 
-* Файл ids.json – массив корректных id
+- Файл ids.json – массив корректных id
 
 ```json
 [12, 123, 1234]
 ```
 
-## Лицензия ##
+## Лицензия
 
 [MIT License](LICENSE)

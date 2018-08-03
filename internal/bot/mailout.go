@@ -139,7 +139,6 @@ func getNewArticles(newArticlesChan chan<- article) {
 
 // mailoutBestArticles рассылает список лучших статей с Habrahabr
 func (bot *Bot) mailoutBestArticles() {
-	logging.LogEvent("Рассылка лучших статей")
 	const limit = 7
 
 	users, err := userdb.GetAllUsers()
@@ -189,7 +188,6 @@ func (bot *Bot) mailoutBestArticles() {
 	}
 
 	wg.Wait()
-	logging.LogEvent("Рассылка лучших статей завершена.")
 }
 
 // mailout рассылает статьи с периодичностью config.Delay наносекунд

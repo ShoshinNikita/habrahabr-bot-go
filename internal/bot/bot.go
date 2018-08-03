@@ -33,7 +33,7 @@ func ParseCorrectIDS(path string) error {
 	err = json.Unmarshal(data, &correctIDs)
 
 	msg := fmt.Sprintf("Корректные id: %v", correctIDs)
-	logging.LogEvent(msg)
+	logging.LogInfo(msg)
 
 	return err
 }
@@ -98,7 +98,7 @@ func (bot *Bot) StartPooling(stopChan chan struct{}) {
 				// В этот цикл мы заходим только тогда, когда кто-то написал боту.
 				// Если кто-то писал, то функция сразу завершается, если нет – завершается вместе с программой
 				// При этом может потеряться часть запросов (они будут необработанны), но с этим ничего нельзя сделать
-				logging.LogEvent("Остановка Long Pooling")
+				logging.LogInfo("Остановка Long Pooling")
 				return
 			}
 		default:
@@ -122,13 +122,10 @@ func (bot *Bot) distributeUpdate(update tgbotapi.Update) {
 
 	if update.Message != nil {
 		if !isCorrectID(update.Message.Chat.ID) {
-			logging.LogEvent("Wrong ID:")
-			logging.LogRequest(logging.RequestData{
-				Username: update.Message.Chat.UserName,
-				ID:       update.Message.Chat.ID,
-				Command:  update.Message.Text})
+			logging.LogInfo("Wrong ID: %d Username: %s Text: %s", update.Message.Chat.ID,
+				update.Message.Chat.UserName, update.Message.Text)
 
-			message := tgbotapi.NewMessage(update.Message.Chat.ID, "Wrong ID")
+			message := tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный ID. Для подробностей писать @ShoshinNikita")
 			bot.messages <- message
 			return
 		}

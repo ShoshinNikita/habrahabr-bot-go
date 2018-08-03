@@ -1,14 +1,10 @@
 package logging
 
 import (
+	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"time"
-
-	"github.com/ShoshinNikita/advanced-log-go"
-
-	"github.com/ShoshinNikita/habrahabr-bot-go/internal/config"
+	"strings"
 )
 
 // ErrorData содержит информацию об ошибке и о пользователе, вызвавшем ошибку
@@ -27,63 +23,38 @@ type RequestData struct {
 	Command  string
 }
 
-var remoteLog *advancedlog.LogAPI
-
-// Initialize инициализирует remoteLog
-func Initialize(debug bool) error {
-	var err error
-	remoteLog, err = advancedlog.NewLog(config.Data.AppToken, config.Data.AdvancedLogURL, debug)
-	return err
-}
-
-// LogEvent логгирует события (например, рассылку статей)
-func LogEvent(event string) {
-	err := remoteLog.Log("event", "", event, time.Now().Unix())
-	if err != nil {
-		log.Println(err)
+func LogInfo(format string, v ...interface{}) {
+	if !strings.HasSuffix(format, "\n") {
+		format += "\n"
 	}
+	format = "[INFO] " + format
+
+	log.Printf(format, v...)
 }
 
 // LogRequest логгирует запрос от пользователя
 func LogRequest(data RequestData) {
-	text := "User: " + data.Username + " ID: " + strconv.FormatInt(data.ID, 10)
-	err := remoteLog.Log("request", data.Command, text, time.Now().Unix())
-	if err != nil {
-		log.Println(err)
-	}
+	log.Printf("[REQ] User: %s ID: %d Cmd: %s\n", data.Username, data.ID, data.Command)
 }
 
 // LogError логгирует ошибку (программы)
 func LogError(data ErrorData) {
-	text := "User: " + data.Username + " Error: " + data.Error.Error()
+	text := fmt.Sprintf("[ERR] User: %s ID: %d Cmd: %s Err: %s", data.Username, data.UserID,
+		data.Command, data.Error)
 	if data.AddInfo != "" {
 		text += " AddInfo: " + data.AddInfo
 	}
 
-	err := remoteLog.Log("error", data.Command, text, time.Now().Unix())
-	if err != nil {
-		log.Println(err)
-	}
+	log.Println(text)
 }
 
 // LogMinorError логгирует мелкие ошибки, которые произошли во время работы программы
 func LogMinorError(funcName, message string, err error) {
-	text := "Function: " + funcName + " Message: " + message + " Error: " + err.Error()
-	err = remoteLog.Log("error", "", text, time.Now().Unix())
-	if err != nil {
-		log.Println(err)
-	}
+	log.Printf("[ERR] Func: %s Err: %s AddInfo: %s\n", funcName, err, message)
 }
 
 // LogFatalError логгирует фатальную ошибку, после чего завершает программу с кодом 1
 func LogFatalError(funcName, message string, err error) {
-	// На всякий случай
-	log.Println(funcName, message, err.Error())
-
-	text := "FATAL ERROR Function: " + funcName + " Message: " + message + " Error: " + err.Error()
-	err = remoteLog.Log("error", "", text, time.Now().Unix())
-	if err != nil {
-		log.Println(err)
-	}
+	log.Printf("[FATAL ERR] Func: %s Err: %s Msg: %s", funcName, err, message)
 	os.Exit(1)
 }
