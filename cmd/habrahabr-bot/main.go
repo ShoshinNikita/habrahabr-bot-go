@@ -21,11 +21,7 @@ func main() {
 	}
 
 	// Инициализация advanced-log
-	err = logging.Initialize(config.Data.Debug)
-	if err != nil {
-		log.Fatal(err)
-	}
-	logging.LogEvent("Старт программы")
+	logging.LogInfo("Старт программы")
 
 	// Инициализация базы данных c пользователями
 	err = userdb.Open("data/users.db")
@@ -40,14 +36,14 @@ func main() {
 	}
 
 	// Инициализация бота
-	logging.LogEvent("Инициализация бота")
+	logging.LogInfo("Инициализация бота")
 	habrBot, err := bot.NewBot()
 	if err != nil {
 		logging.LogFatalError("main", "попытка залогиниться в бота", err)
 	}
 
 	// Запуск бота
-	logging.LogEvent("Запуск бота")
+	logging.LogInfo("Запуск бота")
 	stopChan := make(chan struct{})
 	go habrBot.StartPooling(stopChan)
 
@@ -64,6 +60,6 @@ func main() {
 	time.Sleep(2 * time.Second)
 	// Закрытие базы данных
 	userdb.Close()
-	logging.LogEvent("Остановка работы")
+	logging.LogInfo("Остановка работы")
 	time.Sleep(500 * time.Millisecond)
 }
