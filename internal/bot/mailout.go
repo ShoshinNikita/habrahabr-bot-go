@@ -3,7 +3,6 @@ package bot
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"sort"
 	"strconv"
@@ -87,8 +86,6 @@ func getAllArticles() ([]gofeed.Item, error) {
 			res = append(res, *item)
 		}
 	}
-
-	fmt.Println(len(res))
 
 	sort.Slice(res, func(i, j int) bool {
 		return !res[i].PublishedParsed.Before(*res[j].PublishedParsed)
