@@ -3,14 +3,16 @@ package bot
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/mmcdole/gofeed"
-	"gopkg.in/telegram-bot-api.v4"
+	tgbotapi "gopkg.in/telegram-bot-api.v4"
 
 	"github.com/ShoshinNikita/habrahabr-bot-go/internal/config"
 	"github.com/ShoshinNikita/habrahabr-bot-go/internal/logging"
@@ -70,19 +72,29 @@ var oldArticles smartQueue
 
 // getAllArticles возвращает все gofeed.Item (в порядке убывания по времени, т.е новые раньше)
 func getAllArticles() ([]gofeed.Item, error) {
-	// Получение RSS-ленты
-	feed, err := getRSS(allHabrArticlesURL)
-	if err != nil {
-		return []gofeed.Item{}, err
+	res := []gofeed.Item{}
+
+	// Получение ru RSS-ленты
+	if feedRu, err := getRSS(allRuHabrArticlesURL); err == nil {
+		for _, item := range feedRu.Items {
+			res = append(res, *item)
+		}
 	}
 
-	// Создание списка новых статей
-	var result []gofeed.Item
-	for _, item := range feed.Items {
-		result = append(result, *item)
+	// Получение en RSS-ленты
+	if feedEn, err := getRSS(allEnHabrArticlesURL); err == nil {
+		for _, item := range feedEn.Items {
+			res = append(res, *item)
+		}
 	}
 
-	return result, nil
+	fmt.Println(len(res))
+
+	sort.Slice(res, func(i, j int) bool {
+		return !res[i].PublishedParsed.Before(*res[j].PublishedParsed)
+	})
+
+	return res, nil
 }
 
 // getNewArticles возвращает только новые статьи
@@ -149,7 +161,7 @@ func (bot *Bot) mailoutBestArticles() {
 	var habrBestArticles string
 
 	// Создание списка лучших статей с Habrahabr
-	feed, err := getRSS(bestHabrArticlesURL)
+	feed, err := getRSS(bestRuHabrArticlesURL)
 	if err != nil {
 		logging.LogMinorError("mailoutBestArticles", "попытка получить RSS-ленту Habrahabr", err)
 	} else {

@@ -1,7 +1,7 @@
 package bot
 
 // Константы для определения сайта
-const habrArticleRegexPattern = `(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/(post|company/[\w-_ ]+/blog)/\d{1,7}/?`
+const habrArticleRegexPattern = `(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/(ru|en|)/(post|company/[\w-_ ]+/blog)/\d{1,7}/?`
 
 const habrUserRegexPattern = `^(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/users/[\w\s-]+/?$`
 
@@ -15,8 +15,13 @@ const messageText = `{title} <a href='{IV}'>(IV)</a>
 // ссылка на InstantView с {url} вместо ссылки на статью
 const habrInstantViewURL = "https://t.me/iv?url={url}&rhash=640326b822845b"
 
-const allHabrArticlesURL = "https://habr.com/rss/all/?with_hubs=true:?with_tags=true:"
-const bestHabrArticlesURL = "https://habr.com/rss/best/?with_hubs=true:?with_tags=true:"
+const (
+	allRuHabrArticlesURL = "https://habr.com/ru/rss/all/"
+	allEnHabrArticlesURL = "https://habr.com/en/rss/all/"
+
+	bestRuHabrArticlesURL = "https://habr.com/ru/rss/best/"
+	bestEnHabrArticlesURL = "https://habr.com/en/rss/best/"
+)
 
 const helpText = `📝 <b>КОМАНДЫ</b>:
 * /help – показать помощь

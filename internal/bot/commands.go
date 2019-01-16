@@ -267,7 +267,7 @@ func (bot *Bot) sendIV(msg *tgbotapi.Message) {
 // По-умолчанию – 5, если пользователь указал другое число - другое
 func (bot *Bot) getBest(msg *tgbotapi.Message) {
 	parser := gofeed.NewParser()
-	feed, err := parser.ParseURL(bestHabrArticlesURL)
+	feed, err := parser.ParseURL(bestRuHabrArticlesURL)
 	if err != nil {
 		data := logging.ErrorData{
 			Error:    err,
