@@ -6,14 +6,11 @@ const habrArticleRegexPattern = `(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/(
 const habrUserRegexPattern = `^(https://)?(habrahabr\.ru|habr\.com|habr\.ru)/users/[\w\s-]+/?$`
 
 // Текст для статьи. Нужно отформатировать функцией formatString(...)
-const messageText = `{title} <a href='{IV}'>(IV)</a>
+const messageText = `{title}
 
-<a href='{link}'>Перейти к статье</a>
+<a href='{link}'>Открыть статью</a>
 
-<a href='{link}#comments'>Перейти к комментариям</a>`
-
-// ссылка на InstantView с {url} вместо ссылки на статью
-const habrInstantViewURL = "https://t.me/iv?url={url}&rhash=640326b822845b"
+<a href='{link}#comments'>Открыть комментарии</a>`
 
 const (
 	allRuHabrArticlesURL = "https://habr.com/ru/rss/all/"

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil" // чтение файлов
-	"regexp"
 	"time"
 
 	"github.com/jasonlvhit/gocron" // Job Scheduling Package
@@ -145,62 +144,52 @@ func (bot *Bot) distributeMessages(message *tgbotapi.Message) bool {
 
 	command := message.Command()
 	if command == "" {
-		if res, _ := regexp.MatchString(habrArticleRegexPattern, message.Text); res {
-			go bot.sendIV(message)
-			logging.LogRequest(logging.RequestData{Command: "InstantView", Username: message.Chat.UserName, ID: message.Chat.ID})
-		}
-	} else {
-		// Логгирование запроса
-		logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName, ID: message.Chat.ID})
+		return false
+	}
 
-		switch command {
-		case "help":
-			{
-				go bot.help(message)
-			}
-		case "start":
-			{
-				go bot.start(message)
-			}
-		case "stop":
-			{
-				go bot.stopMailout(message)
-				isRightCommand = true
-			}
-		case "tags":
-			{
-				go bot.getStatus(message)
-				isRightCommand = true
-			}
-		case "add_tags":
-			{
-				go bot.addTags(message)
-				isRightCommand = true
-			}
-		case "del_tags":
-			{
-				go bot.delTags(message)
-				isRightCommand = true
-			}
-		case "del_all_tags":
-			{
-				go bot.delAllTags(message)
-				isRightCommand = true
-			}
-		case "best":
-			{
-				go bot.getBest(message)
-				isRightCommand = true
-			}
-		case "copy_tags":
-			{
-				go bot.copyTags(message)
-				isRightCommand = true
-			}
-		default:
-			{
-				isRightCommand = false
-			}
+	// Логгирование запроса
+	logging.LogRequest(logging.RequestData{Command: "/" + command, Username: message.Chat.UserName, ID: message.Chat.ID})
+
+	switch command {
+	case "help":
+		{
+			go bot.help(message)
+		}
+	case "start":
+		{
+			go bot.start(message)
+		}
+	case "stop":
+		{
+			go bot.stopMailout(message)
+		}
+	case "tags":
+		{
+			go bot.getStatus(message)
+		}
+	case "add_tags":
+		{
+			go bot.addTags(message)
+		}
+	case "del_tags":
+		{
+			go bot.delTags(message)
+		}
+	case "del_all_tags":
+		{
+			go bot.delAllTags(message)
+		}
+	case "best":
+		{
+			go bot.getBest(message)
+		}
+	case "copy_tags":
+		{
+			go bot.copyTags(message)
+		}
+	default:
+		{
+			isRightCommand = false
 		}
 	}
 

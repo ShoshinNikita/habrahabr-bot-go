@@ -126,12 +126,10 @@ func getNewArticles(newArticlesChan chan<- article) {
 				tag = strings.ToLower(tag)
 				tags = append(tags, tag)
 			}
-			// Создания текста сообщения
-			instantView := formatString(habrInstantViewURL, map[string]string{"url": newItems[i].Link})
+
 			message := formatString(messageText,
 				map[string]string{
 					"title": newItems[i].Title,
-					"IV":    instantView,
 					"link":  newItems[i].Link})
 
 			article := article{title: newItems[i].Title, tags: tags, link: newItems[i].Link, message: message}

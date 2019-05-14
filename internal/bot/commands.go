@@ -247,22 +247,6 @@ func (bot *Bot) copyTags(msg *tgbotapi.Message) {
 	bot.messages <- message
 }
 
-// sendIV отправляет пользователю ссылку на статью, которую он прислал, в виде InstantView
-func (bot *Bot) sendIV(msg *tgbotapi.Message) {
-	habrRegexpPattern := regexp.MustCompile(habrArticleRegexPattern)
-
-	link := habrRegexpPattern.FindString(msg.Text)
-	instantViewURL := formatString(habrInstantViewURL, map[string]string{"url": link})
-
-	text := "<a href=\"" + instantViewURL + "\">InstantView</a>\n\n" +
-		"<a href=\"" + link + "\">Перейти к статье</a>\n\n" +
-		"<a href=\"" + link + "#comments\">Перейти к комментариям</a>"
-
-	message := tgbotapi.NewMessage(msg.Chat.ID, text)
-	message.ParseMode = "HTML"
-	bot.messages <- message
-}
-
 // getBest отправляет пользователю лучшие статьи за сегодняшний день.
 // По-умолчанию – 5, если пользователь указал другое число - другое
 func (bot *Bot) getBest(msg *tgbotapi.Message) {
