@@ -1,10 +1,10 @@
 # Habrahabr-бот на Go
 
-Неофициальный бот для рассылки статей с сайтов [habrahabr.ru](https://habrahabr.ru/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habrahabr.ru/post/350858/)
+Неофициальный бот для рассылки статей с сайтов [habr.com](https://habr.com/) в Telegram. Бота можно найти [здесь](https://t.me/unofficial_habr_bot). Статью, описывающую процесс создания бота – [здесь](https://habr.com/post/350858/)
 
 ## Информация о работе
 
-Бот использует [RSS-ленту](https://habrahabr.ru/rss/all) сайта [habrahabr.ru](https://habrahabr.ru/) для получения списка статей. Данные пользователей (id, теги) хранятся в BoltDB.
+Бот использует [RSS-ленту](https://habr.com/rss/all) сайта [habr.com](https://habr.ru/) для получения списка статей. Данные пользователей (id, теги) хранятся в BoltDB.
 
 ## Конфигурационная информация
 
@@ -19,12 +19,13 @@
 ### Содержание файлов
 
 - Файл users.db – boltDB база данных, хранящая данные пользователей
+
   Структура:
 
-      	* users
-      		* id
-      			* Tags
-      			* Mailout
+  - users
+    - id
+      - Tags
+      - Mailout
 
 - Файл lastArticles.json хранит ссылки все последние статьи
 
